@@ -1,0 +1,341 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getDashboardStats } from '../../server/services/stats';
+import { canAdmin } from '../../server/auth/permissions';
+
+const user = Astro.locals.user!;
+if (!canAdmin(user.role)) {
+  return Astro.redirect('/consultas');
+}
+
+const stats = await getDashboardStats();
+const { totals, byYear, byType, byOrigin } = stats;
+
+// Cálculo para barras SVG normalizadas
+const maxYear = Math.max(...byYear.map((y: any) => y.count), 1);
+const maxType = Math.max(...byType.map((t: any) => t.count), 1);
+---
+
+<AppLayout title="Panel de Administración" activeNav="admin">
+  <div class="admin-dashboard">
+    <!-- Encabezado y Navegación de Administración -->
+    <div class="admin-header">
+      <div>
+        <h1 class="page-title">Panel de Control y Estadísticas</h1>
+        <p class="page-desc">
+          Resumen general del repositorio documental digitalizado del Ministerio de Educación de San Juan.
+        </p>
+      </div>
+
+      <!-- Accesos Rápidos a Módulos Administrativos -->
+      <div class="admin-quick-links">
+        <a href="/admin/tipos" class="btn btn-secondary btn-sm">Tipos de Doc</a>
+        <a href="/admin/origenes" class="btn btn-secondary btn-sm">Orígenes</a>
+        <a href="/admin/usuarios" class="btn btn-secondary btn-sm">Usuarios</a>
+        <a href="/admin/auditoria" class="btn btn-secondary btn-sm">Auditoría</a>
+        <a href="/admin/importaciones" class="btn btn-secondary btn-sm">Migración</a>
+      </div>
+    </div>
+
+    <!-- Tarjetas de Métricas Clave (KPIs) -->
+    <div class="kpi-grid">
+      <!-- Total Documentos -->
+      <div class="card kpi-card">
+        <div class="kpi-icon icon-charcoal">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Total Documentos Activos</span>
+          <span class="kpi-value">{totals.total_docs}</span>
+        </div>
+      </div>
+
+      <!-- Digitalizados Este Mes -->
+      <div class="card kpi-card">
+        <div class="kpi-icon icon-red">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Ingresados Este Mes</span>
+          <span class="kpi-value">{totals.created_this_month}</span>
+        </div>
+      </div>
+
+      <!-- Indexados por OCR -->
+      <div class="card kpi-card">
+        <div class="kpi-icon icon-green">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Indexados con OCR</span>
+          <span class="kpi-value">{totals.ocr_completed}</span>
+        </div>
+      </div>
+
+      <!-- Pendientes de Procesamiento -->
+      <div class="card kpi-card">
+        <div class="kpi-icon icon-orange">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">En Cola / Procesando</span>
+          <span class="kpi-value">{totals.ocr_pending}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficos Estadísticos con Paleta Oficial -->
+    <div class="charts-grid">
+      <!-- Documentos por Año -->
+      <div class="card chart-card">
+        <h2 class="chart-title">Documentos por Año</h2>
+        <div class="bar-chart-container">
+          {byYear.map((item: any) => {
+            const percent = Math.round((item.count / maxYear) * 100);
+            return (
+              <div class="bar-row">
+                <span class="bar-label">{item.label}</span>
+                <div class="bar-track">
+                  <div class="bar-fill bar-fill-red" style={`width: ${percent}%;`}></div>
+                </div>
+                <span class="bar-count">{item.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- Documentos por Tipo -->
+      <div class="card chart-card">
+        <h2 class="chart-title">Documentos por Tipo</h2>
+        <div class="bar-chart-container">
+          {byType.map((item: any) => {
+            const percent = Math.round((item.count / maxType) * 100);
+            return (
+              <div class="bar-row">
+                <span class="bar-label">{item.label}</span>
+                <div class="bar-track">
+                  <div class="bar-fill bar-fill-charcoal" style={`width: ${percent}%;`}></div>
+                </div>
+                <span class="bar-count">{item.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+
+    <!-- Distribución por Origen -->
+    <div class="card origins-card">
+      <h2 class="chart-title">Distribución por Repartición de Origen</h2>
+      <div class="origins-pills-grid">
+        {byOrigin.map((o: any) => (
+          <div class="origin-stat-box">
+            <span class="origin-code">{o.label}</span>
+            <span class="origin-count">{o.count} documentos</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .admin-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+  }
+
+  .page-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .admin-quick-links {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .kpi-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-charcoal { background-color: var(--bg-alt); color: var(--sj-charcoal); }
+  .icon-red { background-color: var(--sj-red-subtle); color: var(--sj-red); }
+  .icon-green { background-color: #DEF7EC; color: #03543F; }
+  .icon-orange { background-color: var(--sj-orange-subtle); color: var(--sj-orange); }
+
+  .kpi-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kpi-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    line-height: 1.1;
+    margin-top: 0.25rem;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .chart-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.5rem;
+  }
+
+  .bar-chart-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .bar-label {
+    width: 120px;
+    font-size: 0.8125rem;
+    color: var(--sj-charcoal);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 12px;
+    background-color: var(--bg-alt);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .bar-fill-red { background-color: var(--sj-red); }
+  .bar-fill-charcoal { background-color: var(--sj-charcoal); }
+
+  .bar-count {
+    width: 35px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    text-align: right;
+  }
+
+  .origins-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .origins-pills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .origin-stat-box {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    background-color: #FAFAFA;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .origin-code {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--sj-charcoal);
+  }
+
+  .origin-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 800px) {
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

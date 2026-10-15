@@ -1,0 +1,157 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { db } from '../../server/db/client';
+import { auditLogs, users } from '../../server/db/schema';
+import { canAdmin } from '../../server/auth/permissions';
+import { desc, eq } from 'drizzle-orm';
+
+const currentUser = Astro.locals.user!;
+if (!canAdmin(currentUser.role)) return Astro.redirect('/consultas');
+
+const actionFilter = Astro.url.searchParams.get('action') || undefined;
+
+const query = db
+  .select({
+    id: auditLogs.id,
+    action: auditLogs.action,
+    entityType: auditLogs.entityType,
+    entityId: auditLogs.entityId,
+    ipAddress: auditLogs.ipAddress,
+    details: auditLogs.details,
+    createdAt: auditLogs.createdAt,
+    userName: users.fullName,
+    username: users.username,
+  })
+  .from(auditLogs)
+  .leftJoin(users, eq(auditLogs.userId, users.id))
+  .orderBy(desc(auditLogs.createdAt))
+  .limit(100);
+
+if (actionFilter) {
+  query.where(eq(auditLogs.action, actionFilter));
+}
+
+const logs = await query;
+
+const actionLabels: Record<string, { label: string; class: string }> = {
+  'doc.create': { label: 'Creó Documento', class: 'badge-completed' },
+  'doc.view': { label: 'Consultó Ficha', class: 'badge-neutral' },
+  'doc.download': { label: 'Descargó PDF', class: 'badge-pending' },
+  'doc.update': { label: 'Modificó Datos', class: 'badge-pending' },
+  'doc.delete': { label: 'Baja Lógica', class: 'badge-failed' },
+  'doc.search': { label: 'Búsqueda FTS', class: 'badge-neutral' },
+  'login_success': { label: 'Ingreso al Sistema', class: 'badge-completed' },
+  'login_failed': { label: 'Intento Fallido', class: 'badge-failed' },
+  'logout': { label: 'Cierre de Sesión', class: 'badge-neutral' },
+};
+---
+
+<AppLayout title="Registro de Auditoría" activeNav="admin">
+  <div class="audit-page">
+    <div class="page-header">
+      <div>
+        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
+        <h1 class="page-title">Pistas de Auditoría y Trazabilidad</h1>
+        <p class="page-desc">
+          Registro inalterable de quién cargó, modificó, consultó o descargó cada documento y cuándo.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <a href="/api/audit?format=csv" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Exportar a CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Filtros de Auditoría -->
+    <div class="card filter-card">
+      <form method="GET" class="filter-form">
+        <div class="form-group" style="flex: 1;">
+          <label class="form-label" for="action-select">Filtrar por Tipo de Acción</label>
+          <select id="action-select" name="action" class="form-select" onchange="this.form.submit()">
+            <option value="">Todas las acciones</option>
+            <option value="doc.create" selected={actionFilter === 'doc.create'}>Creó Documento (doc.create)</option>
+            <option value="doc.download" selected={actionFilter === 'doc.download'}>Descargó PDF (doc.download)</option>
+            <option value="doc.view" selected={actionFilter === 'doc.view'}>Consultó Ficha (doc.view)</option>
+            <option value="doc.update" selected={actionFilter === 'doc.update'}>Modificó Datos (doc.update)</option>
+            <option value="doc.delete" selected={actionFilter === 'doc.delete'}>Baja Lógica (doc.delete)</option>
+            <option value="doc.search" selected={actionFilter === 'doc.search'}>Búsqueda (doc.search)</option>
+            <option value="login_success" selected={actionFilter === 'login_success'}>Login Exitoso</option>
+            <option value="login_failed" selected={actionFilter === 'login_failed'}>Login Fallido</option>
+          </select>
+        </div>
+        {actionFilter && (
+          <a href="/admin/auditoria" class="btn btn-secondary btn-sm" style="align-self: flex-end;">
+            Limpiar filtro
+          </a>
+        )}
+      </form>
+    </div>
+
+    <!-- Tabla de Eventos de Auditoría -->
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 170px;">Fecha y Hora</th>
+            <th style="width: 180px;">Usuario</th>
+            <th style="width: 150px;">Acción Realizada</th>
+            <th style="width: 100px;">Entidad</th>
+            <th>Detalles del Evento</th>
+            <th style="width: 130px;">Dirección IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((l) => {
+            const meta = actionLabels[l.action] || { label: l.action, class: 'badge-neutral' };
+            return (
+              <tr>
+                <td>{new Date(l.createdAt).toLocaleString('es-AR')}</td>
+                <td>
+                  <strong>{l.userName || 'Sistema'}</strong>
+                  {l.username && <span class="user-sub"> ({l.username})</span>}
+                </td>
+                <td>
+                  <span class={`badge ${meta.class}`}>{meta.label}</span>
+                </td>
+                <td><code>{l.entityType}</code></td>
+                <td>
+                  {l.entityId && (
+                    <span class="entity-ref">
+                      ID: {l.entityId.slice(0, 8)}...
+                    </span>
+                  )}
+                  {l.details && (
+                    <span class="details-snippet">
+                      {JSON.stringify(l.details)}
+                    </span>
+                  )}
+                </td>
+                <td><code>{l.ipAddress || '127.0.0.1'}</code></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .audit-page { display: flex; flex-direction: column; gap: 1.5rem; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .back-link { font-size: 0.8125rem; color: var(--text-muted); }
+  .page-title { font-size: 1.375rem; font-weight: 700; color: var(--sj-charcoal); }
+  .page-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .filter-card { padding: 1rem; }
+  .filter-form { display: flex; align-items: center; gap: 1rem; }
+  .user-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+  .entity-ref { font-size: 0.75rem; color: var(--sj-charcoal); font-weight: 600; margin-right: 0.5rem; }
+  .details-snippet { font-size: 0.75rem; color: #4B5563; }
+</style>

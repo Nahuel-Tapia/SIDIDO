@@ -1,0 +1,609 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getDocumentTypes, getOrigins } from '../../server/services/catalog';
+
+const types = await getDocumentTypes(true);
+const originsList = await getOrigins(true);
+const currentYear = new Date().getFullYear();
+---
+
+<AppLayout title="Anexar Documento" activeNav="anexar">
+  <div class="anexar-page">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Anexar Nuevo Documento</h1>
+        <p class="page-desc">
+          Complete los metadatos y adjunte el archivo PDF escaneado. El sistema procesará el texto automáticamente mediante OCR.
+        </p>
+      </div>
+      <a href="/consultas" class="btn btn-secondary">Volver a Consultas</a>
+    </div>
+
+    <form id="anexar-form" class="anexar-grid">
+      <!-- Columna Izquierda: Metadatos del Documento -->
+      <div class="card meta-card">
+        <h2 class="card-section-title">1. Datos del Documento</h2>
+
+        <div id="duplicate-warning" class="alert-warning" style="display: none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>Ya existe un documento activo con este Tipo, Origen, Número y Año.</span>
+        </div>
+
+        <div class="form-row-2">
+          <!-- Tipo de Documento (Obligatorio) -->
+          <div class="form-group">
+            <label for="typeId" class="form-label">Tipo de Documento <span class="required">*</span></label>
+            <select id="typeId" name="typeId" class="form-select" required>
+              <option value="">Seleccione un tipo...</option>
+              {types.map((t) => (
+                <option value={t.id}>{t.name} ({t.code})</option>
+              ))}
+            </select>
+          </div>
+
+          <!-- Origen -->
+          <div class="form-group">
+            <label for="originId" class="form-label">Origen (Repartición)</label>
+            <select id="originId" name="originId" class="form-select">
+              <option value="">Sin origen específico</option>
+              {originsList.map((o) => (
+                <option value={o.id}>{o.name} ({o.code})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <!-- Número -->
+          <div class="form-group">
+            <label for="number" class="form-label">Número</label>
+            <input
+              type="text"
+              id="number"
+              name="number"
+              class="form-input"
+              placeholder="Ej: 1420 o 4820-A"
+            />
+          </div>
+
+          <!-- Año -->
+          <div class="form-group">
+            <label for="year" class="form-label">Año</label>
+            <input
+              type="number"
+              id="year"
+              name="year"
+              class="form-input"
+              value={currentYear}
+              min="1900"
+              max={currentYear + 1}
+            />
+          </div>
+        </div>
+
+        <!-- Carátula -->
+        <div class="form-group">
+          <label for="caratula" class="form-label">Carátula</label>
+          <input
+            type="text"
+            id="caratula"
+            name="caratula"
+            class="form-input"
+            placeholder="Título, causa o motivo principal del expediente..."
+          />
+        </div>
+
+        <!-- Extracto -->
+        <div class="form-group">
+          <label for="extracto" class="form-label">Extracto</label>
+          <textarea
+            id="extracto"
+            name="extracto"
+            rows="3"
+            class="form-textarea"
+            placeholder="Resumen del contenido, partes intervinientes o resolución adoptada..."
+          ></textarea>
+        </div>
+
+        <!-- Contenido Manual (Opcional, si ya se tiene el texto) -->
+        <div class="form-group">
+          <label for="contenido" class="form-label">
+            Contenido del Documento
+            <span class="label-hint">(Opcional: Si se adjunta un PDF, se completará con OCR)</span>
+          </label>
+          <textarea
+            id="contenido"
+            name="contenido"
+            rows="4"
+            class="form-textarea"
+            placeholder="Texto completo del documento o notas del operador..."
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Carga de Archivo PDF -->
+      <div class="card file-card">
+        <h2 class="card-section-title">2. Archivo Digitalizado (PDF)</h2>
+
+        <!-- Zona Drag & Drop -->
+        <div id="dropzone" class="dropzone" role="button" tabindex="0">
+          <input type="file" id="pdf-file-input" accept="application/pdf" style="display: none;" />
+          
+          <div class="dropzone-content">
+            <svg class="dropzone-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="12" x2="12" y2="18"></line>
+              <polyline points="9 15 12 12 15 15"></polyline>
+            </svg>
+            <p class="dropzone-text">
+              <strong>Arrastre el archivo PDF aquí</strong> o haga clic para seleccionarlo
+            </p>
+            <span class="dropzone-hint">Solo formato PDF escaneado o digital (hasta 50 MB)</span>
+          </div>
+        </div>
+
+        <!-- Estado de Archivo / Barra de Progreso -->
+        <div id="file-status" class="file-status-box" style="display: none;">
+          <div class="file-info-header">
+            <span id="file-name-display" class="file-name">archivo.pdf</span>
+            <button type="button" id="remove-file-btn" class="btn-remove-file" title="Quitar archivo">&times;</button>
+          </div>
+          
+          <div class="progress-bar-container">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          
+          <div class="progress-meta">
+            <span id="progress-percent">0%</span>
+            <span id="file-size-display">0 KB</span>
+          </div>
+        </div>
+
+        <!-- Resumen de OCR Automático -->
+        <div class="ocr-notice-box">
+          <div class="notice-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <p class="notice-text">
+            Al anexar el documento, nuestro motor de OCR en español indexará las páginas en segundo plano para que quede disponible en las búsquedas inmediatamente.
+          </p>
+        </div>
+
+        <div id="form-error" class="alert-error" style="display: none;"></div>
+
+        <!-- Botones de Acción -->
+        <div class="form-actions">
+          <button type="submit" id="btn-save" class="btn btn-primary btn-save">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            <span class="btn-text">Guardar y Anexar</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</AppLayout>
+
+<script>
+  let uploadedFileData: any = null;
+
+  const dropzone = document.getElementById('dropzone') as HTMLElement;
+  const fileInput = document.getElementById('pdf-file-input') as HTMLInputElement;
+  const fileStatus = document.getElementById('file-status') as HTMLElement;
+  const fileNameDisplay = document.getElementById('file-name-display') as HTMLElement;
+  const fileSizeDisplay = document.getElementById('file-size-display') as HTMLElement;
+  const progressBarFill = document.getElementById('progress-bar-fill') as HTMLElement;
+  const progressPercent = document.getElementById('progress-percent') as HTMLElement;
+  const removeFileBtn = document.getElementById('remove-file-btn') as HTMLElement;
+  const form = document.getElementById('anexar-form') as HTMLFormElement;
+  const duplicateWarning = document.getElementById('duplicate-warning') as HTMLElement;
+  const formError = document.getElementById('form-error') as HTMLElement;
+  const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
+
+  // Manejo de Dropzone
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+  });
+
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('drag-active');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-active');
+    });
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+      handleFileSelected(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) {
+      handleFileSelected(fileInput.files[0]);
+    }
+  });
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function handleFileSelected(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Solo se admiten documentos en formato PDF.');
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      alert('El archivo supera el límite de 50 MB.');
+      return;
+    }
+
+    dropzone.style.display = 'none';
+    fileStatus.style.display = 'block';
+    fileNameDisplay.textContent = file.name;
+    fileSizeDisplay.textContent = formatBytes(file.size);
+    progressBarFill.style.width = '0%';
+    progressPercent.textContent = '0%';
+
+    // Subida con XMLHttpRequest para obtener progreso real
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        progressBarFill.style.width = percent + '%';
+        progressPercent.textContent = percent + '%';
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        uploadedFileData = JSON.parse(xhr.responseText);
+        progressBarFill.style.backgroundColor = '#10B981'; // Verde de completado
+        progressPercent.textContent = 'Subido con éxito';
+      } else {
+        alert('Error al subir el archivo: ' + xhr.responseText);
+        resetFile();
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      alert('Error de red al subir el archivo.');
+      resetFile();
+    });
+
+    xhr.open('POST', '/api/upload/file');
+    xhr.send(formData);
+  }
+
+  function resetFile() {
+    uploadedFileData = null;
+    fileInput.value = '';
+    dropzone.style.display = 'block';
+    fileStatus.style.display = 'none';
+    progressBarFill.style.backgroundColor = 'var(--sj-red)';
+  }
+
+  removeFileBtn.addEventListener('click', resetFile);
+
+  // Chequeo en vivo de duplicados
+  const typeSelect = document.getElementById('typeId') as HTMLSelectElement;
+  const originSelect = document.getElementById('originId') as HTMLSelectElement;
+  const numberInput = document.getElementById('number') as HTMLInputElement;
+  const yearInput = document.getElementById('year') as HTMLInputElement;
+
+  async function checkLiveDuplicate() {
+    const typeId = typeSelect.value;
+    const originId = originSelect.value;
+    const number = numberInput.value.trim();
+    const year = yearInput.value.trim();
+
+    if (!typeId || !number || !year) {
+      duplicateWarning.style.display = 'none';
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({ typeId, number, year });
+      if (originId) params.append('originId', originId);
+
+      const res = await fetch(`/api/documents/check-duplicate?${params.toString()}`);
+      const data = await res.json();
+
+      if (data.isDuplicate) {
+        duplicateWarning.style.display = 'flex';
+      } else {
+        duplicateWarning.style.display = 'none';
+      }
+    } catch (err) {
+      console.warn('Error verificando duplicado:', err);
+    }
+  }
+
+  [typeSelect, originSelect, numberInput, yearInput].forEach((el) => {
+    el.addEventListener('change', checkLiveDuplicate);
+    el.addEventListener('blur', checkLiveDuplicate);
+  });
+
+  // Envío del Formulario
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formError.style.display = 'none';
+    btnSave.disabled = true;
+
+    const payload = {
+      typeId: typeSelect.value,
+      originId: originSelect.value || null,
+      number: numberInput.value.trim() || null,
+      year: yearInput.value ? Number(yearInput.value) : null,
+      caratula: (document.getElementById('caratula') as HTMLInputElement).value.trim() || null,
+      extracto: (document.getElementById('extracto') as HTMLTextAreaElement).value.trim() || null,
+      contenido: (document.getElementById('contenido') as HTMLTextAreaElement).value.trim() || null,
+      fileKey: uploadedFileData?.fileKey || null,
+      fileName: uploadedFileData?.fileName || null,
+      fileSize: uploadedFileData?.fileSize || null,
+      fileSha256: uploadedFileData?.fileSha256 || null,
+    };
+
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        window.location.href = `/documentos/${data.document.id}`;
+      } else {
+        formError.textContent = data.error || 'Error al guardar el documento';
+        formError.style.display = 'block';
+        btnSave.disabled = false;
+      }
+    } catch (err) {
+      formError.textContent = 'Error de conexión con el servidor.';
+      formError.style.display = 'block';
+      btnSave.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .anexar-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    letter-spacing: -0.01em;
+  }
+
+  .page-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .anexar-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .meta-card, .file-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .card-section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.75rem;
+  }
+
+  .required {
+    color: var(--sj-red);
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .label-hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .dropzone {
+    border: 2px dashed #D1D5DB;
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    background-color: #FAFAFA;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .dropzone:hover, .dropzone.drag-active {
+    border-color: var(--sj-charcoal);
+    background-color: #F3F4F6;
+  }
+
+  .dropzone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .dropzone-icon {
+    color: var(--sj-charcoal);
+  }
+
+  .dropzone-text {
+    font-size: 0.9375rem;
+    color: var(--sj-charcoal);
+  }
+
+  .dropzone-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .file-status-box {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    background-color: #FAFAFA;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .file-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .file-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--sj-charcoal);
+  }
+
+  .btn-remove-file {
+    font-size: 1.25rem;
+    color: #9CA3AF;
+    line-height: 1;
+    padding: 0.25rem;
+  }
+  .btn-remove-file:hover {
+    color: var(--sj-red);
+  }
+
+  .progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: #E5E7EB;
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background-color: var(--sj-red);
+    transition: width 0.2s ease;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .ocr-notice-box {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background-color: var(--sj-yellow-subtle);
+    border: 1px solid #F6E05E;
+    border-radius: var(--radius-md);
+  }
+
+  .notice-icon {
+    color: #B7791F;
+    flex-shrink: 0;
+  }
+
+  .notice-text {
+    font-size: 0.8125rem;
+    color: #744210;
+    line-height: 1.4;
+  }
+
+  .alert-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    background-color: var(--sj-orange-subtle);
+    border: 1px solid #FBD38D;
+    color: #C05621;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+  }
+
+  .alert-error {
+    background-color: var(--sj-red-subtle);
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+  }
+
+  .form-actions {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .btn-save {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .anexar-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

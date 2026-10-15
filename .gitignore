@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Compilación y runtime
+dist/
+.astro/
+.edge-profile/
+
+# Variables de entorno sensibles
+.env
+.env.local
+
+# Almacenamiento local de PDFs
+storage/
+
+# Logs y reportes temporales
+*.log
+import_report_*.csv
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

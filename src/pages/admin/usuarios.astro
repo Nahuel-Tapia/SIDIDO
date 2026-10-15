@@ -1,0 +1,206 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { db } from '../../server/db/client';
+import { users } from '../../server/db/schema';
+import { canAdmin } from '../../server/auth/permissions';
+import { desc } from 'drizzle-orm';
+
+const currentUser = Astro.locals.user!;
+if (!canAdmin(currentUser.role)) return Astro.redirect('/consultas');
+
+const userList = await db
+  .select({
+    id: users.id,
+    username: users.username,
+    fullName: users.fullName,
+    email: users.email,
+    role: users.role,
+    active: users.active,
+    lastLoginAt: users.lastLoginAt,
+    createdAt: users.createdAt,
+  })
+  .from(users)
+  .orderBy(desc(users.createdAt));
+---
+
+<AppLayout title="Gestión de Usuarios y Roles" activeNav="admin">
+  <div class="users-page">
+    <div class="page-header">
+      <div>
+        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
+        <h1 class="page-title">Usuarios y Asignación de Roles</h1>
+        <p class="page-desc">Administración de credenciales y niveles de acceso (Administrador, Operador de carga, Consulta).</p>
+      </div>
+
+      <button type="button" id="open-user-modal-btn" class="btn btn-primary">
+        + Nuevo Usuario
+      </button>
+    </div>
+
+    <!-- Modal de Creación de Usuario -->
+    <div id="user-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-card card">
+        <h2 class="modal-title">Registrar Nuevo Usuario</h2>
+        <form id="create-user-form" class="modal-form">
+          <div class="form-group">
+            <label for="new-username" class="form-label">Nombre de Usuario (Login)</label>
+            <input type="text" id="new-username" class="form-input" placeholder="ej: jgonzalez" required />
+          </div>
+
+          <div class="form-group">
+            <label for="new-fullname" class="form-label">Nombre y Apellido</label>
+            <input type="text" id="new-fullname" class="form-input" placeholder="ej: Juan González" required />
+          </div>
+
+          <div class="form-group">
+            <label for="new-email" class="form-label">Correo Institucional (Opcional)</label>
+            <input type="email" id="new-email" class="form-input" placeholder="ej: jgonzalez@sanjuan.edu.ar" />
+          </div>
+
+          <div class="form-group">
+            <label for="new-password" class="form-label">Contraseña</label>
+            <input type="password" id="new-password" class="form-input" placeholder="••••••••" required minlength="6" />
+          </div>
+
+          <div class="form-group">
+            <label for="new-role" class="form-label">Rol y Permisos</label>
+            <select id="new-role" class="form-select" required>
+              <option value="consulta">Consulta (Solo lectura y descarga)</option>
+              <option value="operador">Operador (Carga, OCR, edición y baja)</option>
+              <option value="admin">Administrador (Control total y auditoría)</option>
+            </select>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="close-user-modal-btn" class="btn btn-secondary btn-sm">Cancelar</button>
+            <button type="submit" class="btn btn-primary btn-sm">Crear Usuario</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tabla de Usuarios -->
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Nombre y Apellido</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Último Ingreso</th>
+            <th style="text-align: right;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {userList.map((u) => (
+            <tr>
+              <td><strong>{u.username}</strong></td>
+              <td>{u.fullName}</td>
+              <td>
+                {u.role === 'admin' && <span class="badge badge-failed">Administrador</span>}
+                {u.role === 'operador' && <span class="badge badge-pending">Operador</span>}
+                {u.role === 'consulta' && <span class="badge badge-neutral">Consulta</span>}
+              </td>
+              <td>
+                {u.active ? (
+                  <span class="badge badge-completed">Activo</span>
+                ) : (
+                  <span class="badge badge-neutral">Bloqueado</span>
+                )}
+              </td>
+              <td>
+                {u.lastLoginAt
+                  ? new Date(u.lastLoginAt).toLocaleString('es-AR')
+                  : 'Nunca'}
+              </td>
+              <td style="text-align: right;">
+                {u.id !== currentUser.id && (
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm toggle-user-btn"
+                    data-id={u.id}
+                    data-active={u.active ? 'false' : 'true'}
+                  >
+                    {u.active ? 'Desactivar' : 'Activar'}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</AppLayout>
+
+<script>
+  const modal = document.getElementById('user-modal') as HTMLElement;
+  const openBtn = document.getElementById('open-user-modal-btn') as HTMLElement;
+  const closeBtn = document.getElementById('close-user-modal-btn') as HTMLElement;
+  const form = document.getElementById('create-user-form') as HTMLFormElement;
+
+  openBtn.addEventListener('click', () => (modal.style.display = 'flex'));
+  closeBtn.addEventListener('click', () => (modal.style.display = 'none'));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      username: (document.getElementById('new-username') as HTMLInputElement).value,
+      fullName: (document.getElementById('new-fullname') as HTMLInputElement).value,
+      email: (document.getElementById('new-email') as HTMLInputElement).value || null,
+      password: (document.getElementById('new-password') as HTMLInputElement).value,
+      role: (document.getElementById('new-role') as HTMLSelectElement).value,
+    };
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Error al crear usuario');
+      }
+    } catch {
+      alert('Error de conexión');
+    }
+  });
+
+  document.querySelectorAll('.toggle-user-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const active = btn.getAttribute('data-active') === 'true';
+
+      try {
+        const res = await fetch('/api/users', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, active }),
+        });
+        if (res.ok) {
+          window.location.reload();
+        }
+      } catch {
+        alert('Error al actualizar estado del usuario');
+      }
+    });
+  });
+</script>
+
+<style>
+  .users-page { display: flex; flex-direction: column; gap: 1.5rem; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .back-link { font-size: 0.8125rem; color: var(--text-muted); }
+  .page-title { font-size: 1.375rem; font-weight: 700; color: var(--sj-charcoal); }
+  .page-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .modal-overlay { position: fixed; inset: 0; background-color: rgba(29, 37, 45, 0.4); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+  .modal-card { width: 100%; max-width: 480px; }
+  .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem; }
+  .modal-form { display: flex; flex-direction: column; gap: 1rem; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem; }
+</style>

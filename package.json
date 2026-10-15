@@ -1,0 +1,32 @@
+{
+  "name": "sidido",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321 --host",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "db:push": "drizzle-kit push",
+    "db:seed": "node --import tsx/esm scripts/seed.ts",
+    "worker": "node --import tsx/esm worker/ocr-worker.ts",
+    "migrate:legacy": "node --import tsx/esm scripts/migrate-legacy.ts"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.0.0",
+    "astro": "^5.0.0",
+    "drizzle-orm": "^0.39.0",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.1",
+    "tesseract.js": "^5.1.1",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pdf-parse": "^1.1.4",
+    "drizzle-kit": "^0.30.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

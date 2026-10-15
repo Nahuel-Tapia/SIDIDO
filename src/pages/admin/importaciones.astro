@@ -1,0 +1,113 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { db } from '../../server/db/client';
+import { importRuns, importErrors } from '../../server/db/schema';
+import { canAdmin } from '../../server/auth/permissions';
+import { desc, eq } from 'drizzle-orm';
+
+const user = Astro.locals.user!;
+if (!canAdmin(user.role)) return Astro.redirect('/consultas');
+
+const runs = await db.select().from(importRuns).orderBy(desc(importRuns.startedAt)).limit(20);
+---
+
+<AppLayout title="Migración e Importaciones" activeNav="admin">
+  <div class="import-page">
+    <div class="page-header">
+      <div>
+        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
+        <h1 class="page-title">Historial de Migraciones del SIDIDO Legado</h1>
+        <p class="page-desc">
+          Monitoreo de ejecuciones del script de migración masiva desde archivos CSV y carpetas de PDFs.
+        </p>
+      </div>
+    </div>
+
+    <!-- Guía rápida para correr el CLI -->
+    <div class="card cli-guide-card">
+      <h2 class="guide-title">Instrucciones para Ejecutar la Migración</h2>
+      <p class="guide-desc">
+        Para importar expedientes del sistema anterior por línea de comandos, ejecute el siguiente comando en la terminal:
+      </p>
+      <pre class="code-box">npm run migrate:legacy -- --csv ./datos/export_sidido.csv --pdfs ./datos/pdfs</pre>
+      <p class="guide-note">
+        <strong>Columnas esperadas en el CSV:</strong> <code>tipo, origen, numero, anio, caratula, extracto, contenido, archivo</code>.
+        Si se omiten tipos u orígenes existentes, el script los crea automáticamente.
+      </p>
+    </div>
+
+    <!-- Tabla de Lotes Importados -->
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha de Ejecución</th>
+            <th>Origen de Datos</th>
+            <th>Total Registros</th>
+            <th>Importados con Éxito</th>
+            <th>Omitidos (Duplicados)</th>
+            <th>Fallidos con Error</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {runs.length === 0 ? (
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Aún no se han ejecutado procesos de migración masiva.
+              </td>
+            </tr>
+          ) : (
+            runs.map((r) => (
+              <tr>
+                <td>{new Date(r.startedAt).toLocaleString('es-AR')}</td>
+                <td><code>{r.source}</code></td>
+                <td><strong>{r.totalRecords}</strong></td>
+                <td><span class="badge badge-completed">{r.importedCount}</span></td>
+                <td><span class="badge badge-neutral">{r.skippedCount}</span></td>
+                <td>
+                  {r.failedCount > 0 ? (
+                    <span class="badge badge-failed">{r.failedCount} errores</span>
+                  ) : (
+                    <span class="badge badge-completed">0 errores</span>
+                  )}
+                </td>
+                <td>
+                  {r.status === 'completed' && <span class="badge badge-completed">Completado</span>}
+                  {r.status === 'running' && <span class="badge badge-pending">En ejecución</span>}
+                  {r.status === 'failed' && <span class="badge badge-failed">Falló</span>}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .import-page { display: flex; flex-direction: column; gap: 1.5rem; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .back-link { font-size: 0.8125rem; color: var(--text-muted); }
+  .page-title { font-size: 1.375rem; font-weight: 700; color: var(--sj-charcoal); }
+  .page-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .cli-guide-card {
+    background-color: #FAFAFA;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .guide-title { font-size: 1rem; font-weight: 700; color: var(--sj-charcoal); }
+  .guide-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .code-box {
+    background-color: var(--sj-charcoal);
+    color: #F8F9FA;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    font-family: monospace;
+    font-size: 0.875rem;
+    overflow-x: auto;
+  }
+  .guide-note { font-size: 0.8125rem; color: var(--text-muted); }
+</style>

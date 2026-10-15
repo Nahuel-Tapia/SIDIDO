@@ -1,0 +1,281 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+import { getDocumentById } from '../../../server/services/documents';
+import { getDocumentTypes, getOrigins } from '../../../server/services/catalog';
+import { canCreateOrEdit } from '../../../server/auth/permissions';
+
+const user = Astro.locals.user!;
+const role = user.role;
+const id = Astro.params.id!;
+
+if (!canCreateOrEdit(role)) {
+  return Astro.redirect(`/documentos/${id}`);
+}
+
+const docData = await getDocumentById(id);
+if (!docData) {
+  return Astro.redirect('/consultas');
+}
+
+const types = await getDocumentTypes(true);
+const originsList = await getOrigins(true);
+const { doc } = docData;
+---
+
+<AppLayout title={`Editar Doc N° ${doc.number || 'S/N'}`} activeNav="consultas">
+  <div class="edit-page">
+    <div class="page-header">
+      <div>
+        <a href={`/documentos/${id}`} class="back-link">&larr; Volver a la Ficha del Documento</a>
+        <h1 class="page-title">Editar Documento N° {doc.number || 'S/N'} / {doc.year || '----'}</h1>
+        <p class="page-desc">
+          Modifique los metadatos o el texto indexado. Toda modificación quedará registrada con fecha, hora y usuario en el historial de revisiones.
+        </p>
+      </div>
+    </div>
+
+    <form id="edit-form" class="card edit-card">
+      <div id="error-alert" class="alert-error" style="display: none;"></div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="typeId" class="form-label">Tipo de Documento</label>
+          <select id="typeId" name="typeId" class="form-select" required>
+            {types.map((t) => (
+              <option value={t.id} selected={doc.typeId === t.id}>{t.name} ({t.code})</option>
+            ))}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="originId" class="form-label">Origen (Repartición)</label>
+          <select id="originId" name="originId" class="form-select">
+            <option value="">Sin origen específico</option>
+            {originsList.map((o) => (
+              <option value={o.id} selected={doc.originId === o.id}>{o.name} ({o.code})</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="number" class="form-label">Número</label>
+          <input type="text" id="number" name="number" class="form-input" value={doc.number || ''} />
+        </div>
+
+        <div class="form-group">
+          <label for="year" class="form-label">Año</label>
+          <input type="number" id="year" name="year" class="form-input" value={doc.year || ''} min="1900" max="2030" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="caratula" class="form-label">Carátula</label>
+        <input type="text" id="caratula" name="caratula" class="form-input" value={doc.caratula || ''} />
+      </div>
+
+      <div class="form-group">
+        <label for="extracto" class="form-label">Extracto</label>
+        <textarea id="extracto" name="extracto" rows="3" class="form-textarea">{doc.extracto || ''}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="contenido" class="form-label">Contenido Indexado (Texto completo / OCR)</label>
+        <textarea id="contenido" name="contenido" rows="6" class="form-textarea">{doc.contenido || ''}</textarea>
+      </div>
+
+      <div class="edit-actions">
+        <button type="submit" id="btn-save" class="btn btn-primary">
+          Guardar Cambios
+        </button>
+        <a href={`/documentos/${id}`} class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+
+    <!-- Zona de Peligro: Baja Lógica -->
+    <div class="card danger-card">
+      <h2 class="danger-title">Baja Lógica del Documento</h2>
+      <p class="danger-desc">
+        Dar de baja este documento lo ocultará de las búsquedas públicas y consultas generales. Para proceder, es obligatorio ingresar el motivo de la baja.
+      </p>
+
+      <form id="delete-form" class="delete-form">
+        <div class="form-group">
+          <label for="delete-reason" class="form-label">Motivo de Baja <span class="required">*</span></label>
+          <input
+            type="text"
+            id="delete-reason"
+            name="reason"
+            class="form-input"
+            placeholder="Ej: Anulado por Resolución rectificatoria N° ..., expediente erróneo, etc."
+            required
+          />
+        </div>
+        <button type="submit" id="btn-delete" class="btn btn-danger">
+          Confirmar Baja Lógica
+        </button>
+      </form>
+    </div>
+  </div>
+</AppLayout>
+
+<script define:vars={{ docId: id }}>
+  const editForm = document.getElementById('edit-form');
+  const errorAlert = document.getElementById('error-alert');
+  const deleteForm = document.getElementById('delete-form');
+
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorAlert.style.display = 'none';
+
+    const payload = {
+      typeId: document.getElementById('typeId').value,
+      originId: document.getElementById('originId').value || null,
+      number: document.getElementById('number').value.trim() || null,
+      year: document.getElementById('year').value ? Number(document.getElementById('year').value) : null,
+      caratula: document.getElementById('caratula').value.trim() || null,
+      extracto: document.getElementById('extracto').value.trim() || null,
+      contenido: document.getElementById('contenido').value.trim() || null,
+    };
+
+    try {
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        window.location.href = `/documentos/${docId}`;
+      } else {
+        errorAlert.textContent = data.error || 'Error al actualizar el documento';
+        errorAlert.style.display = 'block';
+      }
+    } catch (err) {
+      errorAlert.textContent = 'Error de red al guardar';
+      errorAlert.style.display = 'block';
+    }
+  });
+
+  deleteForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const reason = document.getElementById('delete-reason').value.trim();
+    if (!reason) {
+      alert('Debe ingresar un motivo para dar de baja el documento.');
+      return;
+    }
+
+    if (!confirm('¿Confirma que desea dar de baja este documento?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Documento dado de baja con éxito.');
+        window.location.href = '/consultas';
+      } else {
+        alert(data.error || 'Error al dar de baja el documento');
+      }
+    } catch (err) {
+      alert('Error de conexión con el servidor.');
+    }
+  });
+</script>
+
+<style>
+  .edit-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .back-link {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    display: inline-block;
+    margin-bottom: 0.25rem;
+  }
+  .back-link:hover {
+    color: var(--sj-charcoal);
+  }
+
+  .page-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+  }
+
+  .page-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .edit-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .edit-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .alert-error {
+    background-color: var(--sj-red-subtle);
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+  }
+
+  .danger-card {
+    border-color: #FCA5A5;
+    background-color: #FFF5F5;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .danger-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #991B1B;
+  }
+
+  .danger-desc {
+    font-size: 0.8125rem;
+    color: #7F1D1D;
+  }
+
+  .delete-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .required {
+    color: #DC2626;
+  }
+</style>

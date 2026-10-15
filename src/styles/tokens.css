@@ -1,0 +1,35 @@
+/* Kit de Marca Oficial San Juan Gobierno */
+:root {
+  /* Paleta Oficial */
+  --sj-charcoal: #1D252D;    /* Pantone 433 C: Texto principal, títulos, solidez */
+  --sj-red: #E03C31;         /* Pantone 179 C: Acción principal, botones primarios */
+  --sj-red-hover: #C52F25;
+  --sj-red-subtle: #FDEDEB;
+  --sj-orange: #FF8200;      /* Pantone 151 C: Alertas moderadas, OCR activo */
+  --sj-orange-subtle: #FFF4E5;
+  --sj-yellow: #FBDD40;      /* Pantone 114 C: Resaltados de búsqueda, destacados */
+  --sj-yellow-subtle: #FEF9D9;
+
+  /* Superficies y Neutros */
+  --bg-main: #F8F9FA;        /* Fondo general suave */
+  --bg-surface: #FFFFFF;     /* Fondo de tarjetas, modales y tablas */
+  --bg-alt: #F1F3F5;
+  --border-light: #E5E7EB;   /* Bordes minimalistas de 1px */
+  --border-focus: #1D252D;
+
+  /* Tipografía Oficial */
+  --font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --text-primary: #1D252D;
+  --text-muted: #6B7280;
+  --text-inverted: #FFFFFF;
+
+  /* Elevaciones sutiles (Minimalistas) */
+  --shadow-sm: 0 1px 2px rgba(29, 37, 45, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(29, 37, 45, 0.06), 0 2px 4px -2px rgba(29, 37, 45, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(29, 37, 45, 0.08);
+
+  /* Radios y Espaciado */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
