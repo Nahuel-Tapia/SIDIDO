@@ -1,9 +1,10 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
+import AdminNav from '../../components/admin/AdminNav.astro';
 import { db } from '../../server/db/client';
-import { importRuns, importErrors } from '../../server/db/schema';
+import { importRuns } from '../../server/db/schema';
 import { canAdmin } from '../../server/auth/permissions';
-import { desc, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 
 const user = Astro.locals.user!;
 if (!canAdmin(user.role)) return Astro.redirect('/consultas');
@@ -13,9 +14,10 @@ const runs = await db.select().from(importRuns).orderBy(desc(importRuns.startedA
 
 <AppLayout title="Migración e Importaciones" activeNav="admin">
   <div class="import-page">
+    <AdminNav activeTab="importaciones" />
+
     <div class="page-header">
       <div>
-        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
         <h1 class="page-title">Historial de Migraciones del SIDIDO Legado</h1>
         <p class="page-desc">
           Monitoreo de ejecuciones del script de migración masiva desde archivos CSV y carpetas de PDFs.
@@ -53,7 +55,7 @@ const runs = await db.select().from(importRuns).orderBy(desc(importRuns.startedA
         <tbody>
           {runs.length === 0 ? (
             <tr>
-              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.25rem;">
                 Aún no se han ejecutado procesos de migración masiva.
               </td>
             </tr>
@@ -73,9 +75,9 @@ const runs = await db.select().from(importRuns).orderBy(desc(importRuns.startedA
                   )}
                 </td>
                 <td>
-                  {r.status === 'completed' && <span class="badge badge-completed">Completado</span>}
-                  {r.status === 'running' && <span class="badge badge-pending">En ejecución</span>}
-                  {r.status === 'failed' && <span class="badge badge-failed">Falló</span>}
+                  {r.status === 'completed' && <span class="badge badge-completed"><span class="badge-dot"></span>Completado</span>}
+                  {r.status === 'running' && <span class="badge badge-pending"><span class="badge-dot"></span>En ejecución</span>}
+                  {r.status === 'failed' && <span class="badge badge-failed"><span class="badge-dot"></span>Falló</span>}
                 </td>
               </tr>
             ))
@@ -87,27 +89,26 @@ const runs = await db.select().from(importRuns).orderBy(desc(importRuns.startedA
 </AppLayout>
 
 <style>
-  .import-page { display: flex; flex-direction: column; gap: 1.5rem; }
+  .import-page { display: flex; flex-direction: column; gap: 1.35rem; }
   .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-  .back-link { font-size: 0.8125rem; color: var(--text-muted); }
-  .page-title { font-size: 1.375rem; font-weight: 700; color: var(--sj-charcoal); }
-  .page-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .page-title { font-size: 1.45rem; font-weight: 700; color: var(--sj-charcoal); }
+  .page-desc { font-size: 0.875rem; color: var(--text-secondary); }
   .cli-guide-card {
-    background-color: #FAFAFA;
+    background-color: #F8FAFC;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.55rem;
   }
   .guide-title { font-size: 1rem; font-weight: 700; color: var(--sj-charcoal); }
-  .guide-desc { font-size: 0.875rem; color: var(--text-muted); }
+  .guide-desc { font-size: 0.875rem; color: var(--text-secondary); }
   .code-box {
     background-color: var(--sj-charcoal);
     color: #F8F9FA;
-    padding: 0.75rem 1rem;
+    padding: 0.8rem 1rem;
     border-radius: var(--radius-md);
-    font-family: monospace;
-    font-size: 0.875rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
     overflow-x: auto;
   }
-  .guide-note { font-size: 0.8125rem; color: var(--text-muted); }
+  .guide-note { font-size: 0.8125rem; color: var(--text-secondary); }
 </style>

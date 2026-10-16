@@ -1,5 +1,6 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
+import AdminNav from '../../components/admin/AdminNav.astro';
 import { getDashboardStats } from '../../server/services/stats';
 import { canAdmin } from '../../server/auth/permissions';
 
@@ -11,36 +12,32 @@ if (!canAdmin(user.role)) {
 const stats = await getDashboardStats();
 const { totals, byYear, byType, byOrigin } = stats;
 
-// Cálculo para barras SVG normalizadas
+// Cálculo para barras normalizadas
 const maxYear = Math.max(...byYear.map((y: any) => y.count), 1);
 const maxType = Math.max(...byType.map((t: any) => t.count), 1);
 ---
 
 <AppLayout title="Panel de Administración" activeNav="admin">
   <div class="admin-dashboard">
-    <!-- Encabezado y Navegación de Administración -->
+    <AdminNav activeTab="resumen" />
+
+    <!-- Encabezado de Administración -->
     <div class="admin-header">
       <div>
         <h1 class="page-title">Panel de Control y Estadísticas</h1>
         <p class="page-desc">
-          Resumen general del repositorio documental digitalizado del Ministerio de Educación de San Juan.
+          Haga clic sobre cualquier año, tipo o repartición para explorar directamente sus documentos en Consultas.
         </p>
       </div>
-
-      <!-- Accesos Rápidos a Módulos Administrativos -->
-      <div class="admin-quick-links">
-        <a href="/admin/tipos" class="btn btn-secondary btn-sm">Tipos de Doc</a>
-        <a href="/admin/origenes" class="btn btn-secondary btn-sm">Orígenes</a>
-        <a href="/admin/usuarios" class="btn btn-secondary btn-sm">Usuarios</a>
-        <a href="/admin/auditoria" class="btn btn-secondary btn-sm">Auditoría</a>
-        <a href="/admin/importaciones" class="btn btn-secondary btn-sm">Migración</a>
-      </div>
+      <a href="/anexar" class="btn btn-primary">
+        + Anexar Documento
+      </a>
     </div>
 
     <!-- Tarjetas de Métricas Clave (KPIs) -->
     <div class="kpi-grid">
       <!-- Total Documentos -->
-      <div class="card kpi-card">
+      <a href="/consultas" class="card kpi-card kpi-interactive" title="Ver todos los documentos">
         <div class="kpi-icon icon-charcoal">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -51,7 +48,7 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
           <span class="kpi-label">Total Documentos Activos</span>
           <span class="kpi-value">{totals.total_docs}</span>
         </div>
-      </div>
+      </a>
 
       <!-- Digitalizados Este Mes -->
       <div class="card kpi-card">
@@ -98,22 +95,26 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
       </div>
     </div>
 
-    <!-- Gráficos Estadísticos con Paleta Oficial -->
+    <!-- Gráficos Estadísticos Interactivos -->
     <div class="charts-grid">
       <!-- Documentos por Año -->
       <div class="card chart-card">
-        <h2 class="chart-title">Documentos por Año</h2>
+        <div class="chart-header">
+          <h2 class="chart-title">Documentos por Año</h2>
+          <span class="chart-hint">Clic para filtrar</span>
+        </div>
         <div class="bar-chart-container">
           {byYear.map((item: any) => {
             const percent = Math.round((item.count / maxYear) * 100);
+            const href = item.year_num ? `/consultas?year=${item.year_num}` : '/consultas';
             return (
-              <div class="bar-row">
+              <a href={href} class="bar-row" title={`Ver documentos del año ${item.label}`}>
                 <span class="bar-label">{item.label}</span>
                 <div class="bar-track">
                   <div class="bar-fill bar-fill-red" style={`width: ${percent}%;`}></div>
                 </div>
                 <span class="bar-count">{item.count}</span>
-              </div>
+              </a>
             );
           })}
         </div>
@@ -121,33 +122,46 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
 
       <!-- Documentos por Tipo -->
       <div class="card chart-card">
-        <h2 class="chart-title">Documentos por Tipo</h2>
+        <div class="chart-header">
+          <h2 class="chart-title">Documentos por Tipo</h2>
+          <span class="chart-hint">Clic para filtrar</span>
+        </div>
         <div class="bar-chart-container">
           {byType.map((item: any) => {
             const percent = Math.round((item.count / maxType) * 100);
             return (
-              <div class="bar-row">
+              <a href={`/consultas?typeId=${item.id}`} class="bar-row" title={`Filtrar por ${item.label}`}>
                 <span class="bar-label">{item.label}</span>
                 <div class="bar-track">
                   <div class="bar-fill bar-fill-charcoal" style={`width: ${percent}%;`}></div>
                 </div>
                 <span class="bar-count">{item.count}</span>
-              </div>
+              </a>
             );
           })}
         </div>
       </div>
     </div>
 
-    <!-- Distribución por Origen -->
+    <!-- Distribución por Origen (Interactiva) -->
     <div class="card origins-card">
-      <h2 class="chart-title">Distribución por Repartición de Origen</h2>
+      <div class="chart-header">
+        <h2 class="chart-title">Distribución por Repartición de Origen</h2>
+        <span class="chart-hint">Seleccione una repartición para ver sus expedientes</span>
+      </div>
       <div class="origins-pills-grid">
         {byOrigin.map((o: any) => (
-          <div class="origin-stat-box">
-            <span class="origin-code">{o.label}</span>
-            <span class="origin-count">{o.count} documentos</span>
-          </div>
+          <a
+            href={`/consultas?originId=${o.id}`}
+            class="origin-stat-box"
+            title={o.name || o.label}
+          >
+            <div class="origin-top-row">
+              <span class="origin-code">{o.label}</span>
+              <span class="badge badge-neutral">{o.count}</span>
+            </div>
+            <span class="origin-name-sub">{o.name || 'Repartición oficial'}</span>
+          </a>
         ))}
       </div>
     </div>
@@ -158,7 +172,7 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
   .admin-dashboard {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.35rem;
   }
 
   .admin-header {
@@ -170,21 +184,15 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.55rem;
     font-weight: 700;
     color: var(--sj-charcoal);
+    letter-spacing: -0.02em;
   }
 
   .page-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
-  }
-
-  .admin-quick-links {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    color: var(--text-secondary);
   }
 
   .kpi-grid {
@@ -198,20 +206,28 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
     align-items: center;
     gap: 1rem;
     padding: 1.25rem;
+    transition: all var(--transition-fast);
+  }
+
+  .kpi-interactive:hover {
+    border-color: var(--sj-red);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
 
   .kpi-icon {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
 
   .icon-charcoal { background-color: var(--bg-alt); color: var(--sj-charcoal); }
   .icon-red { background-color: var(--sj-red-subtle); color: var(--sj-red); }
-  .icon-green { background-color: #DEF7EC; color: #03543F; }
+  .icon-green { background-color: #ECFDF5; color: #047857; }
   .icon-orange { background-color: var(--sj-orange-subtle); color: var(--sj-orange); }
 
   .kpi-content {
@@ -220,23 +236,23 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
   }
 
   .kpi-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 500;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    font-weight: 600;
   }
 
   .kpi-value {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
     color: var(--sj-charcoal);
     line-height: 1.1;
-    margin-top: 0.25rem;
+    margin-top: 0.2rem;
   }
 
   .charts-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 1.35rem;
   }
 
   .chart-card {
@@ -245,31 +261,54 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
     gap: 1rem;
   }
 
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.6rem;
+  }
+
   .chart-title {
     font-size: 1rem;
     font-weight: 700;
     color: var(--sj-charcoal);
-    border-bottom: 1px solid var(--border-light);
-    padding-bottom: 0.5rem;
+  }
+
+  .chart-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 500;
   }
 
   .bar-chart-container {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.55rem;
   }
 
   .bar-row {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-fast);
+  }
+
+  .bar-row:hover {
+    background-color: var(--bg-alt);
+  }
+
+  .bar-row:hover .bar-label {
+    color: var(--sj-red);
   }
 
   .bar-label {
-    width: 120px;
-    font-size: 0.8125rem;
+    width: 125px;
+    font-size: 0.825rem;
     color: var(--sj-charcoal);
-    font-weight: 500;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -277,7 +316,7 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
 
   .bar-track {
     flex: 1;
-    height: 12px;
+    height: 11px;
     background-color: var(--bg-alt);
     border-radius: 9999px;
     overflow: hidden;
@@ -294,7 +333,7 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
 
   .bar-count {
     width: 35px;
-    font-size: 0.8125rem;
+    font-size: 0.825rem;
     font-weight: 700;
     color: var(--sj-charcoal);
     text-align: right;
@@ -308,29 +347,46 @@ const maxType = Math.max(...byType.map((t: any) => t.count), 1);
 
   .origins-pills-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.85rem;
   }
 
   .origin-stat-box {
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
-    padding: 0.75rem 1rem;
-    background-color: #FAFAFA;
+    padding: 0.85rem 1rem;
+    background-color: #F8FAFC;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    transition: all var(--transition-fast);
+  }
+
+  .origin-stat-box:hover {
+    border-color: var(--sj-red);
+    background-color: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+
+  .origin-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .origin-code {
     font-weight: 700;
-    font-size: 0.9375rem;
+    font-size: 0.95rem;
     color: var(--sj-charcoal);
   }
 
-  .origin-count {
+  .origin-name-sub {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   @media (max-width: 800px) {

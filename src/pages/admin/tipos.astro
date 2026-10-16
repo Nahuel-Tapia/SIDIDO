@@ -1,5 +1,6 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
+import AdminNav from '../../components/admin/AdminNav.astro';
 import { getDocumentTypes } from '../../server/services/catalog';
 import { canAdmin } from '../../server/auth/permissions';
 
@@ -11,9 +12,10 @@ const types = await getDocumentTypes(false);
 
 <AppLayout title="Tipos de Documento" activeNav="admin">
   <div class="catalog-page">
+    <AdminNav activeTab="tipos" />
+
     <div class="page-header">
       <div>
-        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
         <h1 class="page-title">Gestión de Tipos de Documento</h1>
         <p class="page-desc">ABM de clasificaciones documentales (ej: Resolución, Decreto, Expediente).</p>
       </div>
@@ -49,33 +51,36 @@ const types = await getDocumentTypes(false);
       <table class="table">
         <thead>
           <tr>
-            <th style="width: 100px;">Código</th>
+            <th style="width: 110px;">Código</th>
             <th>Nombre del Tipo</th>
-            <th style="width: 120px;">Estado</th>
-            <th style="width: 140px; text-align: right;">Acciones</th>
+            <th style="width: 130px;">Estado</th>
+            <th style="width: 180px; text-align: right;">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {types.map((t) => (
             <tr>
-              <td><strong>{t.code}</strong></td>
-              <td>{t.name}</td>
+              <td><span class="doc-number-pill"><strong>{t.code}</strong></span></td>
+              <td><strong>{t.name}</strong></td>
               <td>
                 {t.active ? (
-                  <span class="badge badge-completed">Activo</span>
+                  <span class="badge badge-completed"><span class="badge-dot"></span>Activo</span>
                 ) : (
                   <span class="badge badge-neutral">Inactivo</span>
                 )}
               </td>
               <td style="text-align: right;">
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm toggle-btn"
-                  data-id={t.id}
-                  data-active={t.active ? 'false' : 'true'}
-                >
-                  {t.active ? 'Desactivar' : 'Activar'}
-                </button>
+                <div style="display: inline-flex; gap: 0.4rem;">
+                  <a href={`/consultas?typeId=${t.id}`} class="btn btn-secondary btn-sm">Ver Docs</a>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm toggle-btn"
+                    data-id={t.id}
+                    data-active={t.active ? 'false' : 'true'}
+                  >
+                    {t.active ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -141,7 +146,7 @@ const types = await getDocumentTypes(false);
   .catalog-page {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.35rem;
   }
   .page-header {
     display: flex;
@@ -150,23 +155,20 @@ const types = await getDocumentTypes(false);
     flex-wrap: wrap;
     gap: 1rem;
   }
-  .back-link {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-  }
   .page-title {
-    font-size: 1.375rem;
+    font-size: 1.45rem;
     font-weight: 700;
     color: var(--sj-charcoal);
   }
   .page-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background-color: rgba(29, 37, 45, 0.4);
+    background-color: rgba(29, 37, 45, 0.45);
+    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;

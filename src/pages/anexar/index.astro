@@ -13,24 +13,41 @@ const currentYear = new Date().getFullYear();
       <div>
         <h1 class="page-title">Anexar Nuevo Documento</h1>
         <p class="page-desc">
-          Complete los metadatos y adjunte el archivo PDF escaneado. El sistema procesará el texto automáticamente mediante OCR.
+          Arrastre el PDF para previsualizarlo y autocompletar datos, o complete la ficha técnica manualmente.
         </p>
       </div>
-      <a href="/consultas" class="btn btn-secondary">Volver a Consultas</a>
+      <a href="/consultas" class="btn btn-secondary">
+        &larr; Volver a Consultas
+      </a>
     </div>
 
     <form id="anexar-form" class="anexar-grid">
       <!-- Columna Izquierda: Metadatos del Documento -->
       <div class="card meta-card">
-        <h2 class="card-section-title">1. Datos del Documento</h2>
+        <div class="section-header-row">
+          <div class="step-badge">1</div>
+          <div>
+            <h2 class="card-section-title">Datos del Expediente / Documento</h2>
+            <p class="card-section-sub">Identificación oficial para búsqueda rápida</p>
+          </div>
+        </div>
 
+        <!-- Banner de Autocompletado Inteligente -->
+        <div id="autofill-banner" class="alert-autofill" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          <span>Se sugirieron campos automáticamente a partir del nombre del archivo PDF.</span>
+        </div>
+
+        <!-- Alerta en Vivo de Duplicado -->
         <div id="duplicate-warning" class="alert-warning" style="display: none;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
             <line x1="12" y1="9" x2="12" y2="13"></line>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
-          <span>Ya existe un documento activo con este Tipo, Origen, Número y Año.</span>
+          <span>Atención: Ya existe un documento activo con este Tipo, Origen, Número y Año.</span>
         </div>
 
         <div class="form-row-2">
@@ -40,7 +57,9 @@ const currentYear = new Date().getFullYear();
             <select id="typeId" name="typeId" class="form-select" required>
               <option value="">Seleccione un tipo...</option>
               {types.map((t) => (
-                <option value={t.id}>{t.name} ({t.code})</option>
+                <option value={t.id} data-code={t.code} data-name={t.name}>
+                  {t.name} ({t.code})
+                </option>
               ))}
             </select>
           </div>
@@ -51,7 +70,9 @@ const currentYear = new Date().getFullYear();
             <select id="originId" name="originId" class="form-select">
               <option value="">Sin origen específico</option>
               {originsList.map((o) => (
-                <option value={o.id}>{o.name} ({o.code})</option>
+                <option value={o.id} data-code={o.code} data-name={o.name}>
+                  {o.name} ({o.code})
+                </option>
               ))}
             </select>
           </div>
@@ -87,7 +108,7 @@ const currentYear = new Date().getFullYear();
 
         <!-- Carátula -->
         <div class="form-group">
-          <label for="caratula" class="form-label">Carátula</label>
+          <label for="caratula" class="form-label">Carátula / Título Principal</label>
           <input
             type="text"
             id="caratula"
@@ -99,7 +120,7 @@ const currentYear = new Date().getFullYear();
 
         <!-- Extracto -->
         <div class="form-group">
-          <label for="extracto" class="form-label">Extracto</label>
+          <label for="extracto" class="form-label">Extracto / Síntesis</label>
           <textarea
             id="extracto"
             name="extracto"
@@ -109,49 +130,67 @@ const currentYear = new Date().getFullYear();
           ></textarea>
         </div>
 
-        <!-- Contenido Manual (Opcional, si ya se tiene el texto) -->
-        <div class="form-group">
-          <label for="contenido" class="form-label">
-            Contenido del Documento
-            <span class="label-hint">(Opcional: Si se adjunta un PDF, se completará con OCR)</span>
-          </label>
-          <textarea
-            id="contenido"
-            name="contenido"
-            rows="4"
-            class="form-textarea"
-            placeholder="Texto completo del documento o notas del operador..."
-          ></textarea>
-        </div>
+        <!-- Contenido Manual (Colapsable / Opcional) -->
+        <details class="manual-content-details">
+          <summary class="manual-content-summary">
+            <span>Transcripción o Contenido Manual (Opcional)</span>
+            <span class="label-hint">Si adjunta un PDF, el OCR lo indexará automáticamente</span>
+          </summary>
+          <div class="form-group" style="margin-top: 0.75rem;">
+            <textarea
+              id="contenido"
+              name="contenido"
+              rows="4"
+              class="form-textarea"
+              placeholder="Texto completo del documento o notas adicionales del operador..."
+            ></textarea>
+          </div>
+        </details>
       </div>
 
-      <!-- Columna Derecha: Carga de Archivo PDF -->
+      <!-- Columna Derecha: Carga y Previsualización en Vivo del PDF -->
       <div class="card file-card">
-        <h2 class="card-section-title">2. Archivo Digitalizado (PDF)</h2>
+        <div class="section-header-row">
+          <div class="step-badge">2</div>
+          <div>
+            <h2 class="card-section-title">Archivo Digitalizado (PDF)</h2>
+            <p class="card-section-sub">Subida directa con vista previa e indexación OCR en español</p>
+          </div>
+        </div>
 
         <!-- Zona Drag & Drop -->
         <div id="dropzone" class="dropzone" role="button" tabindex="0">
           <input type="file" id="pdf-file-input" accept="application/pdf" style="display: none;" />
           
           <div class="dropzone-content">
-            <svg class="dropzone-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="12" x2="12" y2="18"></line>
-              <polyline points="9 15 12 12 15 15"></polyline>
-            </svg>
+            <div class="dropzone-icon-circle">
+              <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="12" x2="12" y2="18"></line>
+                <polyline points="9 15 12 12 15 15"></polyline>
+              </svg>
+            </div>
             <p class="dropzone-text">
-              <strong>Arrastre el archivo PDF aquí</strong> o haga clic para seleccionarlo
+              <strong>Arrastre el archivo PDF aquí</strong> o haga clic para examinar
             </p>
-            <span class="dropzone-hint">Solo formato PDF escaneado o digital (hasta 50 MB)</span>
+            <span class="dropzone-hint">Formato PDF escaneado o digital (máx. 50 MB) • Autocompleta datos si el nombre incluye Tipo y Número</span>
           </div>
         </div>
 
-        <!-- Estado de Archivo / Barra de Progreso -->
+        <!-- Estado de Archivo + Visor de Previsualización en Vivo -->
         <div id="file-status" class="file-status-box" style="display: none;">
           <div class="file-info-header">
-            <span id="file-name-display" class="file-name">archivo.pdf</span>
-            <button type="button" id="remove-file-btn" class="btn-remove-file" title="Quitar archivo">&times;</button>
+            <div class="file-title-group">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sj-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <span id="file-name-display" class="file-name">archivo.pdf</span>
+            </div>
+            <button type="button" id="remove-file-btn" class="btn btn-secondary btn-sm" title="Cambiar o quitar archivo">
+              Cambiar PDF
+            </button>
           </div>
           
           <div class="progress-bar-container">
@@ -159,22 +198,30 @@ const currentYear = new Date().getFullYear();
           </div>
           
           <div class="progress-meta">
-            <span id="progress-percent">0%</span>
+            <span id="progress-percent">Subiendo... 0%</span>
             <span id="file-size-display">0 KB</span>
+          </div>
+
+          <!-- Previsualización instantánea del PDF para leer mientras se carga -->
+          <div class="live-preview-wrapper">
+            <div class="live-preview-bar">
+              <span>Vista previa del documento seleccionado</span>
+            </div>
+            <iframe id="local-pdf-preview" class="local-pdf-frame" title="Vista previa del PDF seleccionado"></iframe>
           </div>
         </div>
 
         <!-- Resumen de OCR Automático -->
         <div class="ocr-notice-box">
           <div class="notice-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="16" x2="12" y2="12"></line>
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
           </div>
           <p class="notice-text">
-            Al anexar el documento, nuestro motor de OCR en español indexará las páginas en segundo plano para que quede disponible en las búsquedas inmediatamente.
+            Al guardar, el motor híbrido extraerá el texto digital o ejecutará <strong>OCR en español</strong> en segundo plano sin demorar su carga.
           </p>
         </div>
 
@@ -188,7 +235,7 @@ const currentYear = new Date().getFullYear();
               <polyline points="17 21 17 13 7 13 7 21"></polyline>
               <polyline points="7 3 7 8 15 8"></polyline>
             </svg>
-            <span class="btn-text">Guardar y Anexar</span>
+            <span class="btn-text">Guardar y Anexar Documento</span>
           </button>
         </div>
       </div>
@@ -198,6 +245,7 @@ const currentYear = new Date().getFullYear();
 
 <script>
   let uploadedFileData: any = null;
+  let previewObjectUrl: string | null = null;
 
   const dropzone = document.getElementById('dropzone') as HTMLElement;
   const fileInput = document.getElementById('pdf-file-input') as HTMLInputElement;
@@ -207,10 +255,18 @@ const currentYear = new Date().getFullYear();
   const progressBarFill = document.getElementById('progress-bar-fill') as HTMLElement;
   const progressPercent = document.getElementById('progress-percent') as HTMLElement;
   const removeFileBtn = document.getElementById('remove-file-btn') as HTMLElement;
+  const localPdfPreview = document.getElementById('local-pdf-preview') as HTMLIFrameElement;
+  const autofillBanner = document.getElementById('autofill-banner') as HTMLElement;
   const form = document.getElementById('anexar-form') as HTMLFormElement;
   const duplicateWarning = document.getElementById('duplicate-warning') as HTMLElement;
   const formError = document.getElementById('form-error') as HTMLElement;
   const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
+
+  const typeSelect = document.getElementById('typeId') as HTMLSelectElement;
+  const originSelect = document.getElementById('originId') as HTMLSelectElement;
+  const numberInput = document.getElementById('number') as HTMLInputElement;
+  const yearInput = document.getElementById('year') as HTMLInputElement;
+  const caratulaInput = document.getElementById('caratula') as HTMLInputElement;
 
   // Manejo de Dropzone
   dropzone.addEventListener('click', () => fileInput.click());
@@ -252,6 +308,73 @@ const currentYear = new Date().getFullYear();
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  function normalizeStr(s: string) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  // Autocompletado inteligente a partir del nombre del archivo PDF
+  function smartAutofillFromFilename(filename: string) {
+    const base = filename.replace(/\.pdf$/i, '');
+    const norm = normalizeStr(base);
+    let suggestedAny = false;
+
+    // 1. Detectar Tipo de Documento si no fue elegido aún
+    if (!typeSelect.value) {
+      for (const opt of Array.from(typeSelect.options)) {
+        if (!opt.value) continue;
+        const code = normalizeStr(opt.dataset.code || '');
+        const name = normalizeStr(opt.dataset.name || '').split(' ')[0];
+        if (
+          (name && norm.includes(name)) ||
+          (code && new RegExp(`(^|[_\\-\\s])${code}([_\\-\\s]|$)`).test(norm))
+        ) {
+          typeSelect.value = opt.value;
+          suggestedAny = true;
+          break;
+        }
+      }
+    }
+
+    // 2. Detectar Origen / Repartición si no fue elegido aún
+    if (!originSelect.value) {
+      for (const opt of Array.from(originSelect.options)) {
+        if (!opt.value) continue;
+        const code = normalizeStr(opt.dataset.code || '');
+        if (code && new RegExp(`(^|[_\\-\\s])${code}([_\\-\\s]|$)`).test(norm)) {
+          originSelect.value = opt.value;
+          suggestedAny = true;
+          break;
+        }
+      }
+    }
+
+    // 3. Detectar Año (1990-2035)
+    const yearMatch = base.match(/(?:^|[_\-\s])(19\d{2}|20[0-3]\d)(?:$|[_\-\s])/);
+    const detectedYear = yearMatch ? yearMatch[1] : null;
+    if (detectedYear) {
+      yearInput.value = detectedYear;
+      suggestedAny = true;
+    }
+
+    // 4. Detectar Número de Documento
+    if (!numberInput.value.trim()) {
+      const tokens = base.split(/[_\-\s]+/);
+      for (const tok of tokens) {
+        if (tok === detectedYear) continue;
+        if (/^\d{1,6}(-[A-Za-z0-9]+)?$/.test(tok)) {
+          numberInput.value = tok.toUpperCase();
+          suggestedAny = true;
+          break;
+        }
+      }
+    }
+
+    if (suggestedAny) {
+      autofillBanner.style.display = 'flex';
+      checkLiveDuplicate();
+    }
+  }
+
   function handleFileSelected(file: File) {
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       alert('Solo se admiten documentos en formato PDF.');
@@ -264,11 +387,19 @@ const currentYear = new Date().getFullYear();
     }
 
     dropzone.style.display = 'none';
-    fileStatus.style.display = 'block';
+    fileStatus.style.display = 'flex';
     fileNameDisplay.textContent = file.name;
     fileSizeDisplay.textContent = formatBytes(file.size);
     progressBarFill.style.width = '0%';
     progressPercent.textContent = '0%';
+
+    // Mostrar previsualización local inmediata del PDF
+    if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = URL.createObjectURL(file);
+    localPdfPreview.src = previewObjectUrl;
+
+    // Intentar autocompletar campos desde el nombre del archivo
+    smartAutofillFromFilename(file.name);
 
     // Subida con XMLHttpRequest para obtener progreso real
     const xhr = new XMLHttpRequest();
@@ -279,15 +410,15 @@ const currentYear = new Date().getFullYear();
       if (e.lengthComputable) {
         const percent = Math.round((e.loaded / e.total) * 100);
         progressBarFill.style.width = percent + '%';
-        progressPercent.textContent = percent + '%';
+        progressPercent.textContent = `Subiendo... ${percent}%`;
       }
     });
 
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         uploadedFileData = JSON.parse(xhr.responseText);
-        progressBarFill.style.backgroundColor = '#10B981'; // Verde de completado
-        progressPercent.textContent = 'Subido con éxito';
+        progressBarFill.style.backgroundColor = '#10B981';
+        progressPercent.textContent = '✓ Archivo listo para anexar';
       } else {
         alert('Error al subir el archivo: ' + xhr.responseText);
         resetFile();
@@ -306,18 +437,17 @@ const currentYear = new Date().getFullYear();
   function resetFile() {
     uploadedFileData = null;
     fileInput.value = '';
+    if (previewObjectUrl) {
+      URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = null;
+    }
+    localPdfPreview.src = 'about:blank';
     dropzone.style.display = 'block';
     fileStatus.style.display = 'none';
     progressBarFill.style.backgroundColor = 'var(--sj-red)';
   }
 
   removeFileBtn.addEventListener('click', resetFile);
-
-  // Chequeo en vivo de duplicados
-  const typeSelect = document.getElementById('typeId') as HTMLSelectElement;
-  const originSelect = document.getElementById('originId') as HTMLSelectElement;
-  const numberInput = document.getElementById('number') as HTMLInputElement;
-  const yearInput = document.getElementById('year') as HTMLInputElement;
 
   async function checkLiveDuplicate() {
     const typeId = typeSelect.value;
@@ -363,7 +493,7 @@ const currentYear = new Date().getFullYear();
       originId: originSelect.value || null,
       number: numberInput.value.trim() || null,
       year: yearInput.value ? Number(yearInput.value) : null,
-      caratula: (document.getElementById('caratula') as HTMLInputElement).value.trim() || null,
+      caratula: caratulaInput.value.trim() || null,
       extracto: (document.getElementById('extracto') as HTMLTextAreaElement).value.trim() || null,
       contenido: (document.getElementById('contenido') as HTMLTextAreaElement).value.trim() || null,
       fileKey: uploadedFileData?.fileKey || null,
@@ -412,35 +542,62 @@ const currentYear = new Date().getFullYear();
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.55rem;
     font-weight: 700;
     color: var(--sj-charcoal);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
   .page-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .anexar-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+    align-items: start;
   }
 
   .meta-card, .file-card {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.2rem;
+  }
+
+  .section-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.85rem;
+  }
+
+  .step-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: var(--sj-charcoal);
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
 
   .card-section-title {
-    font-size: 1.125rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--sj-charcoal);
-    border-bottom: 1px solid var(--border-light);
-    padding-bottom: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .card-section-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
   }
 
   .required {
@@ -459,78 +616,112 @@ const currentYear = new Date().getFullYear();
     color: var(--text-muted);
   }
 
+  .manual-content-details {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    background-color: #F8FAFC;
+  }
+
+  .manual-content-summary {
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--sj-charcoal);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
   .dropzone {
-    border: 2px dashed #D1D5DB;
+    border: 2px dashed var(--border-medium);
     border-radius: var(--radius-lg);
     padding: 2.5rem 1.5rem;
     text-align: center;
-    background-color: #FAFAFA;
+    background-color: #F8FAFC;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
   }
 
   .dropzone:hover, .dropzone.drag-active {
-    border-color: var(--sj-charcoal);
-    background-color: #F3F4F6;
+    border-color: var(--sj-red);
+    background-color: var(--sj-red-subtle);
   }
 
   .dropzone-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.55rem;
+  }
+
+  .dropzone-icon-circle {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.25rem;
   }
 
   .dropzone-icon {
-    color: var(--sj-charcoal);
+    color: var(--sj-red);
   }
 
   .dropzone-text {
-    font-size: 0.9375rem;
+    font-size: 0.95rem;
     color: var(--sj-charcoal);
   }
 
   .dropzone-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    max-width: 380px;
   }
 
   .file-status-box {
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
     padding: 1rem;
-    background-color: #FAFAFA;
+    background-color: #F8FAFC;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.65rem;
   }
 
   .file-info-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
+  }
+
+  .file-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
   }
 
   .file-name {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.875rem;
     color: var(--sj-charcoal);
-  }
-
-  .btn-remove-file {
-    font-size: 1.25rem;
-    color: #9CA3AF;
-    line-height: 1;
-    padding: 0.25rem;
-  }
-  .btn-remove-file:hover {
-    color: var(--sj-red);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .progress-bar-container {
     width: 100%;
-    height: 8px;
-    background-color: #E5E7EB;
+    height: 7px;
+    background-color: #E2E8F0;
     border-radius: 9999px;
     overflow: hidden;
   }
@@ -545,60 +736,101 @@ const currentYear = new Date().getFullYear();
     display: flex;
     justify-content: space-between;
     font-size: 0.75rem;
-    color: var(--text-muted);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .live-preview-wrapper {
+    margin-top: 0.35rem;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background-color: #525659;
+  }
+
+  .live-preview-bar {
+    background-color: var(--sj-charcoal);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .local-pdf-frame {
+    width: 100%;
+    height: 310px;
+    border: none;
+    display: block;
   }
 
   .ocr-notice-box {
     display: flex;
     gap: 0.75rem;
-    padding: 0.875rem 1rem;
+    padding: 0.85rem 1rem;
     background-color: var(--sj-yellow-subtle);
-    border: 1px solid #F6E05E;
+    border: 1px solid #FDE047;
     border-radius: var(--radius-md);
   }
 
   .notice-icon {
-    color: #B7791F;
+    color: #B45309;
     flex-shrink: 0;
+    margin-top: 0.1rem;
   }
 
   .notice-text {
     font-size: 0.8125rem;
-    color: #744210;
-    line-height: 1.4;
+    color: #78350F;
+    line-height: 1.45;
+  }
+
+  .alert-autofill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    background-color: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    color: #065F46;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 500;
   }
 
   .alert-warning {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.625rem 0.875rem;
+    padding: 0.65rem 0.875rem;
     background-color: var(--sj-orange-subtle);
-    border: 1px solid #FBD38D;
-    color: #C05621;
+    border: 1px solid var(--sj-orange-border);
+    color: #9A3412;
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
+    font-weight: 600;
   }
 
   .alert-error {
     background-color: var(--sj-red-subtle);
     color: #991B1B;
-    border: 1px solid #FCA5A5;
-    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--sj-red-border);
+    padding: 0.65rem 0.875rem;
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
+    font-weight: 500;
   }
 
   .form-actions {
     margin-top: auto;
-    padding-top: 1rem;
+    padding-top: 0.75rem;
     border-top: 1px solid var(--border-light);
   }
 
   .btn-save {
     width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
+    padding: 0.8rem;
+    font-size: 0.95rem;
+    font-weight: 600;
   }
 
   @media (max-width: 900px) {

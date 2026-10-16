@@ -43,12 +43,20 @@ function formatBytes(bytes: number | null) {
     <div class="detail-header">
       <div class="header-left">
         <a href="/consultas" class="back-link">
-          &larr; Volver a Consultas
+          &larr; Volver al listado de Consultas
         </a>
         <div class="doc-badge-row">
           <span class="badge badge-neutral">{typeName}</span>
           {originCode && <span class="badge badge-neutral">{originCode}</span>}
-          <span class="doc-id-pill">N° {doc.number || 'S/N'} / {doc.year || '----'}</span>
+          <span class="doc-number-pill">
+            N° <strong>{doc.number || 'S/N'}</strong> / {doc.year || '----'}
+          </span>
+          {doc.ocrStatus === 'completed' && (
+            <span class="badge badge-completed">
+              <span class="badge-dot"></span>
+              OCR Indexado
+            </span>
+          )}
           {doc.deletedAt && <span class="badge badge-failed">DADO DE BAJA</span>}
         </div>
         <h1 class="doc-headline">{doc.caratula || 'Sin carátula especificada'}</h1>
@@ -59,9 +67,9 @@ function formatBytes(bytes: number | null) {
           <a
             href={`/api/documents/${doc.id}/file?download=1`}
             class="btn btn-primary"
-            title="Descargar documento oficial"
+            title="Descargar documento oficial en PDF"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -72,7 +80,7 @@ function formatBytes(bytes: number | null) {
 
         {canCreateOrEdit(role) && !doc.deletedAt && (
           <a href={`/documentos/${doc.id}/editar`} class="btn btn-secondary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
@@ -82,13 +90,65 @@ function formatBytes(bytes: number | null) {
       </div>
     </div>
 
-    <!-- Contenido en Dos Columnas: Ficha + Visor PDF -->
-    <div class="detail-split">
-      <!-- Columna Izquierda: Metadatos, Contenido OCR e Historial -->
-      <div class="meta-column">
-        <!-- Ficha Técnica -->
-        <div class="card">
-          <h2 class="section-title">Metadatos del Expediente</h2>
+    <!-- Contenido en Dos Columnas: Panel por Pestañas + Visor PDF -->
+    <div id="detail-split-layout" class="detail-split">
+      <!-- Columna Izquierda: Pestañas Limpias sin scroll excesivo -->
+      <div class="meta-column card">
+        <div class="detail-tabs" role="tablist" aria-label="Información del documento">
+          <button
+            type="button"
+            class="tab-btn active"
+            data-tab="ficha"
+            role="tab"
+            aria-selected="true"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>Ficha y Extracto</span>
+          </button>
+
+          <button
+            type="button"
+            class="tab-btn"
+            data-tab="ocr"
+            role="tab"
+            aria-selected="false"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 7 4 4 20 4 20 7"></polyline>
+              <line x1="9" y1="20" x2="15" y2="20"></line>
+              <line x1="12" y1="4" x2="12" y2="20"></line>
+            </svg>
+            <span>Texto OCR</span>
+          </button>
+
+          <button
+            type="button"
+            class="tab-btn"
+            data-tab="historial"
+            role="tab"
+            aria-selected="false"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Historial ({revisions.length})</span>
+          </button>
+        </div>
+
+        <!-- PANEL 1: Ficha Técnica y Extracto -->
+        <div id="tab-panel-ficha" class="tab-panel">
+          {doc.extracto && (
+            <div class="extracto-highlight-box">
+              <h3 class="subsection-title">Síntesis / Extracto Oficial</h3>
+              <p class="extracto-text">{doc.extracto}</p>
+            </div>
+          )}
+
+          <h2 class="section-subtitle">Datos Registrales</h2>
           <dl class="meta-dl">
             <div class="meta-item">
               <dt>Tipo de Documento</dt>
@@ -100,7 +160,7 @@ function formatBytes(bytes: number | null) {
             </div>
             <div class="meta-item">
               <dt>Número y Año</dt>
-              <dd><strong>{doc.number || 'S/N'}</strong> del año <strong>{doc.year || '----'}</strong></dd>
+              <dd><strong>{doc.number || 'S/N'}</strong> / <strong>{doc.year || '----'}</strong></dd>
             </div>
             <div class="meta-item">
               <dt>Fecha de Digitalización</dt>
@@ -111,33 +171,23 @@ function formatBytes(bytes: number | null) {
               <dd>{creatorName || 'Usuario del sistema'}</dd>
             </div>
             <div class="meta-item">
-              <dt>Archivo PDF</dt>
-              <dd>{doc.fileName || 'Documento adjunto'} ({formatBytes(doc.fileSize)})</dd>
-            </div>
-            <div class="meta-item">
-              <dt>Estado de OCR</dt>
-              <dd>
-                {doc.ocrStatus === 'completed' && <span class="badge badge-completed">Indexado correctamente</span>}
-                {doc.ocrStatus === 'processing' && <span class="badge badge-pending">Procesando OCR</span>}
-                {doc.ocrStatus === 'pending' && <span class="badge badge-pending">En cola de OCR</span>}
-                {doc.ocrStatus === 'failed' && <span class="badge badge-failed">Error en OCR</span>}
-                {doc.ocrStatus === 'none' && <span class="badge badge-neutral">Sin archivo</span>}
-              </dd>
+              <dt>Archivo Adjunto</dt>
+              <dd>{doc.fileName || 'Sin archivo'} ({formatBytes(doc.fileSize)})</dd>
             </div>
           </dl>
-
-          {doc.extracto && (
-            <div class="extracto-block">
-              <h3 class="subsection-title">Extracto</h3>
-              <p class="extracto-text">{doc.extracto}</p>
-            </div>
-          )}
         </div>
 
-        <!-- Contenido Completo del Documento (OCR) -->
-        <div class="card">
-          <div class="content-header">
-            <h2 class="section-title">Contenido del Documento (Indexado)</h2>
+        <!-- PANEL 2: Contenido Completo del Documento (OCR) con Buscador Interno -->
+        <div id="tab-panel-ocr" class="tab-panel" style="display: none;">
+          <div class="ocr-toolbar">
+            <div class="ocr-search-wrapper">
+              <input
+                type="search"
+                id="ocr-filter-input"
+                class="form-input ocr-search-input"
+                placeholder="Buscar y resaltar palabra dentro del texto..."
+              />
+            </div>
             <button type="button" id="copy-content-btn" class="btn btn-secondary btn-sm" title="Copiar texto al portapapeles">
               Copiar Texto
             </button>
@@ -145,7 +195,7 @@ function formatBytes(bytes: number | null) {
           
           <div class="content-body" id="doc-content-text">
             {doc.contenido ? (
-              <pre class="content-pre">{doc.contenido}</pre>
+              <pre id="ocr-pre-content" class="content-pre" data-raw={doc.contenido}>{doc.contenido}</pre>
             ) : (
               <p class="content-empty">
                 {doc.fileKey
@@ -156,9 +206,8 @@ function formatBytes(bytes: number | null) {
           </div>
         </div>
 
-        <!-- Historial de Revisiones y Auditoría del Documento -->
-        <div class="card">
-          <h2 class="section-title">Historial de Revisiones</h2>
+        <!-- PANEL 3: Historial de Revisiones -->
+        <div id="tab-panel-historial" class="tab-panel" style="display: none;">
           <div class="revisions-list">
             {revisions.map((r) => (
               <div class="revision-entry">
@@ -170,13 +219,13 @@ function formatBytes(bytes: number | null) {
                       {r.rev.action === 'update' && 'Modificación de datos'}
                       {r.rev.action === 'delete' && 'Baja lógica'}
                       {r.rev.action === 'restore' && 'Restauración'}
-                      {r.rev.action === 'ocr_update' && 'Indexación por OCR'}
+                      {r.rev.action === 'ocr_update' && 'Indexación automática por OCR'}
                     </span>
                     <span class="revision-date">
                       {new Date(r.rev.changedAt).toLocaleString('es-AR')}
                     </span>
                   </div>
-                  <span class="revision-author">{r.userName || 'Sistema'}</span>
+                  <span class="revision-author">Operador: {r.userName || 'Sistema'} • Versión #{r.rev.version}</span>
                 </div>
               </div>
             ))}
@@ -189,23 +238,33 @@ function formatBytes(bytes: number | null) {
         <div class="card viewer-card">
           <div class="viewer-header">
             <div class="viewer-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sj-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
               </svg>
               <span>Visor Oficial del Documento</span>
             </div>
             
-            {doc.fileKey && (
-              <a
-                href={`/api/documents/${doc.id}/file?download=1`}
+            <div class="viewer-controls">
+              <button
+                type="button"
+                id="expand-viewer-btn"
                 class="btn btn-secondary btn-sm"
-                target="_blank"
-                rel="noopener"
+                title="Ampliar o restaurar el ancho del visor PDF"
               >
-                Abrir en nueva pestaña
-              </a>
-            )}
+                Ampliar Visor
+              </button>
+              {doc.fileKey && (
+                <a
+                  href={`/api/documents/${doc.id}/file`}
+                  class="btn btn-secondary btn-sm"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Nueva pestaña &#8599;
+                </a>
+              )}
+            </div>
           </div>
 
           <div class="viewer-viewport">
@@ -232,28 +291,86 @@ function formatBytes(bytes: number | null) {
 </AppLayout>
 
 <script>
-  const copyBtn = document.getElementById('copy-content-btn');
-  const contentText = document.getElementById('doc-content-text');
+  // Pestañas de la columna izquierda
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const panels: Record<string, HTMLElement | null> = {
+    ficha: document.getElementById('tab-panel-ficha'),
+    ocr: document.getElementById('tab-panel-ocr'),
+    historial: document.getElementById('tab-panel-historial'),
+  };
 
-  if (copyBtn && contentText) {
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = (btn as HTMLElement).dataset.tab || 'ficha';
+      tabBtns.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+
+      Object.entries(panels).forEach(([key, panel]) => {
+        if (panel) {
+          panel.style.display = key === target ? 'flex' : 'none';
+        }
+      });
+    });
+  });
+
+  // Buscador interno en el texto OCR
+  const ocrInput = document.getElementById('ocr-filter-input') as HTMLInputElement;
+  const ocrPre = document.getElementById('ocr-pre-content') as HTMLElement;
+
+  function escapeHtml(str: string) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  ocrInput?.addEventListener('input', () => {
+    if (!ocrPre) return;
+    const raw = ocrPre.dataset.raw || '';
+    const term = ocrInput.value.trim();
+    if (!term) {
+      ocrPre.textContent = raw;
+      return;
+    }
+    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedTerm})`, 'gi');
+    ocrPre.innerHTML = escapeHtml(raw).replace(regex, '<mark>$1</mark>');
+  });
+
+  // Copiar texto OCR
+  const copyBtn = document.getElementById('copy-content-btn');
+  if (copyBtn && ocrPre) {
     copyBtn.addEventListener('click', () => {
-      const text = contentText.innerText;
+      const text = ocrPre.dataset.raw || ocrPre.innerText;
       navigator.clipboard.writeText(text).then(() => {
         const orig = copyBtn.innerText;
-        copyBtn.innerText = '¡Copiado!';
+        copyBtn.innerText = '✓ ¡Copiado!';
         setTimeout(() => {
           copyBtn.innerText = orig;
         }, 2000);
       });
     });
   }
+
+  // Ampliar / Restaurar ancho del visor PDF
+  const expandBtn = document.getElementById('expand-viewer-btn');
+  const splitLayout = document.getElementById('detail-split-layout');
+  expandBtn?.addEventListener('click', () => {
+    if (!splitLayout) return;
+    const isExpanded = splitLayout.classList.toggle('viewer-expanded');
+    expandBtn.textContent = isExpanded ? 'Restaurar Vista Dividida' : 'Ampliar Visor';
+  });
 </script>
 
 <style>
   .document-detail-page {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.35rem;
   }
 
   .detail-header {
@@ -263,32 +380,29 @@ function formatBytes(bytes: number | null) {
     gap: 1.5rem;
     flex-wrap: wrap;
     background-color: var(--bg-surface);
-    padding: 1.5rem;
+    padding: 1.35rem 1.5rem;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
   }
 
   .back-link {
     font-size: 0.8125rem;
-    color: var(--text-muted);
+    font-weight: 500;
+    color: var(--text-secondary);
     display: inline-block;
     margin-bottom: 0.5rem;
   }
   .back-link:hover {
-    color: var(--sj-charcoal);
+    color: var(--sj-red);
   }
 
   .doc-badge-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .doc-id-pill {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--sj-charcoal);
+    margin-bottom: 0.55rem;
+    flex-wrap: wrap;
   }
 
   .doc-headline {
@@ -301,81 +415,137 @@ function formatBytes(bytes: number | null) {
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.65rem;
   }
 
   .detail-split {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    grid-template-columns: 5fr 7fr;
+    gap: 1.35rem;
     align-items: start;
+    transition: all var(--transition-fast);
+  }
+
+  .detail-split.viewer-expanded {
+    grid-template-columns: 1fr;
   }
 
   .meta-column {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.15rem;
+    padding: 1.15rem 1.25rem;
   }
 
-  .section-title {
-    font-size: 1rem;
+  .detail-tabs {
+    display: flex;
+    gap: 0.35rem;
+    background-color: var(--bg-alt);
+    padding: 0.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+  }
+
+  .tab-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .tab-btn:hover {
+    color: var(--sj-charcoal);
+  }
+
+  .tab-btn.active {
+    background-color: var(--bg-surface);
+    color: var(--sj-red);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+  }
+
+  .extracto-highlight-box {
+    background-color: #F8FAFC;
+    border-left: 3px solid var(--sj-red);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 0.85rem 1rem;
+  }
+
+  .subsection-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+  }
+
+  .extracto-text {
+    font-size: 0.875rem;
+    color: var(--sj-charcoal);
+    line-height: 1.55;
+  }
+
+  .section-subtitle {
+    font-size: 0.85rem;
     font-weight: 700;
     color: var(--sj-charcoal);
     border-bottom: 1px solid var(--border-light);
-    padding-bottom: 0.5rem;
-    margin-bottom: 1rem;
+    padding-bottom: 0.45rem;
   }
 
   .meta-dl {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.875rem 1rem;
+    gap: 0.9rem 1rem;
     font-size: 0.875rem;
   }
 
   .meta-item dt {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
   }
 
   .meta-item dd {
     font-size: 0.875rem;
     color: var(--sj-charcoal);
-    margin-top: 0.125rem;
+    margin-top: 0.15rem;
   }
 
-  .extracto-block {
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-light);
-  }
-
-  .subsection-title {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--sj-charcoal);
-    margin-bottom: 0.375rem;
-  }
-
-  .extracto-text {
-    font-size: 0.875rem;
-    color: #374151;
-    line-height: 1.5;
-  }
-
-  .content-header {
+  .ocr-toolbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 0.6rem;
+  }
+
+  .ocr-search-wrapper {
+    flex: 1;
+  }
+
+  .ocr-search-input {
+    padding: 0.42rem 0.75rem;
+    font-size: 0.8125rem;
   }
 
   .content-body {
-    max-height: 380px;
+    max-height: 460px;
     overflow-y: auto;
-    background-color: #FAFBFB;
+    background-color: #F8FAFC;
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
     padding: 1rem;
@@ -383,11 +553,11 @@ function formatBytes(bytes: number | null) {
 
   .content-pre {
     font-family: inherit;
-    font-size: 0.8125rem;
-    line-height: 1.6;
+    font-size: 0.84rem;
+    line-height: 1.65;
     white-space: pre-wrap;
     word-break: break-word;
-    color: #374151;
+    color: var(--sj-charcoal);
   }
 
   .content-empty {
@@ -399,7 +569,8 @@ function formatBytes(bytes: number | null) {
   .revisions-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.85rem;
+    padding: 0.25rem 0;
   }
 
   .revision-entry {
@@ -409,29 +580,30 @@ function formatBytes(bytes: number | null) {
   }
 
   .revision-bullet {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background-color: var(--sj-red);
-    margin-top: 0.375rem;
+    margin-top: 0.35rem;
     flex-shrink: 0;
   }
 
   .revision-details {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.15rem;
   }
 
   .revision-title {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8125rem;
+    font-size: 0.825rem;
+    flex-wrap: wrap;
   }
 
   .revision-action {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--sj-charcoal);
   }
 
@@ -442,12 +614,12 @@ function formatBytes(bytes: number | null) {
 
   .revision-author {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .viewer-column {
     position: sticky;
-    top: 5rem;
+    top: 4.5rem;
   }
 
   .viewer-card {
@@ -455,17 +627,19 @@ function formatBytes(bytes: number | null) {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
-    min-height: 600px;
+    height: calc(100vh - 110px);
+    min-height: 620px;
   }
 
   .viewer-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 1.1rem;
     border-bottom: 1px solid var(--border-light);
-    background-color: #FAFBFB;
+    background-color: #F8FAFC;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   .viewer-title {
@@ -473,8 +647,14 @@ function formatBytes(bytes: number | null) {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--sj-charcoal);
+  }
+
+  .viewer-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
   }
 
   .viewer-viewport {

@@ -1,0 +1,62 @@
+---
+interface Props {
+  activeTab: 'resumen' | 'tipos' | 'origenes' | 'usuarios' | 'auditoria' | 'importaciones';
+}
+
+const { activeTab } = Astro.props;
+
+const tabs = [
+  { id: 'resumen', label: 'Resumen y Estadísticas', href: '/admin' },
+  { id: 'tipos', label: 'Tipos de Documento', href: '/admin/tipos' },
+  { id: 'origenes', label: 'Orígenes / Reparticiones', href: '/admin/origenes' },
+  { id: 'usuarios', label: 'Usuarios y Roles', href: '/admin/usuarios' },
+  { id: 'auditoria', label: 'Pistas de Auditoría', href: '/admin/auditoria' },
+  { id: 'importaciones', label: 'Migración Masiva', href: '/admin/importaciones' },
+];
+---
+
+<nav class="admin-subnav" aria-label="Módulos de Administración">
+  {tabs.map((tab) => (
+    <a
+      href={tab.href}
+      class={`admin-tab-item ${activeTab === tab.id ? 'active' : ''}`}
+    >
+      {tab.label}
+    </a>
+  ))}
+</nav>
+
+<style>
+  .admin-subnav {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background-color: var(--bg-surface);
+    padding: 0.4rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-xs);
+    overflow-x: auto;
+  }
+
+  .admin-tab-item {
+    padding: 0.5rem 0.95rem;
+    border-radius: var(--radius-md);
+    font-size: 0.825rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+  }
+
+  .admin-tab-item:hover {
+    background-color: var(--bg-alt);
+    color: var(--sj-charcoal);
+  }
+
+  .admin-tab-item.active {
+    background-color: var(--sj-charcoal);
+    color: var(--text-inverted);
+    box-shadow: var(--shadow-xs);
+  }
+</style>

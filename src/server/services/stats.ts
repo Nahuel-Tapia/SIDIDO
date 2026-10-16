@@ -20,10 +20,11 @@ export async function getDashboardStats() {
     created_this_month: 0,
   };
 
-  // 2. Documentos por Año (últimos 5 años)
+  // 2. Documentos por Año (últimos 6 años)
   const byYearQuery = await db.execute(sql`
     SELECT 
       coalesce(year::text, 'S/D') AS label,
+      year AS year_num,
       COUNT(*)::int AS count
     FROM documents
     WHERE deleted_at IS NULL
@@ -35,25 +36,29 @@ export async function getDashboardStats() {
   // 3. Documentos por Tipo
   const byTypeQuery = await db.execute(sql`
     SELECT 
+      dt.id AS id,
       dt.name AS label,
+      dt.code AS code,
       COUNT(d.id)::int AS count
     FROM document_types dt
     LEFT JOIN documents d ON d.type_id = dt.id AND d.deleted_at IS NULL
-    GROUP BY dt.id, dt.name
+    GROUP BY dt.id, dt.name, dt.code
     ORDER BY count DESC
-    LIMIT 6
+    LIMIT 8
   `);
 
   // 4. Documentos por Origen
   const byOriginQuery = await db.execute(sql`
     SELECT 
+      orig.id AS id,
       coalesce(orig.code, 'S/O') AS label,
+      orig.name AS name,
       COUNT(d.id)::int AS count
     FROM origins orig
     LEFT JOIN documents d ON d.origin_id = orig.id AND d.deleted_at IS NULL
-    GROUP BY orig.id, orig.code
+    GROUP BY orig.id, orig.code, orig.name
     ORDER BY count DESC
-    LIMIT 6
+    LIMIT 8
   `);
 
   return {

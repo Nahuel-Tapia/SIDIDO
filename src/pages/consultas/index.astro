@@ -39,6 +39,15 @@ const searchResult = await searchDocuments({
   pageSize: 12,
 });
 
+const advancedFiltersCount = [
+  originId,
+  number,
+  year,
+  caratula,
+  extracto,
+  contenido,
+].filter(Boolean).length;
+
 const activeFiltersCount = [
   typeId,
   originId,
@@ -48,6 +57,23 @@ const activeFiltersCount = [
   extracto,
   contenido,
 ].filter(Boolean).length;
+
+// Helper para construir URLs de filtro rápido conservando otros parámetros
+function buildFilterUrl(overrides: Record<string, string | number | undefined>) {
+  const params = new URLSearchParams(url.searchParams);
+  params.delete('page');
+  for (const [key, val] of Object.entries(overrides)) {
+    if (val === undefined || val === '') {
+      params.delete(key);
+    } else {
+      params.set(key, String(val));
+    }
+  }
+  const qs = params.toString();
+  return qs ? `/consultas?${qs}` : '/consultas';
+}
+
+const selectedOrigin = originsList.find((o) => o.id === originId);
 ---
 
 <AppLayout title="Consultas de Documentos" activeNav="consultas">
@@ -57,7 +83,7 @@ const activeFiltersCount = [
       <div>
         <h1 class="page-title">Consulta de Expedientes y Documentos</h1>
         <p class="page-desc">
-          Búsqueda de texto completo en carátula, extracto y contenido escaneado (insensible a tildes y mayúsculas).
+          Busque por número, año, tema o cualquier palabra dentro del documento escaneado.
         </p>
       </div>
 
@@ -67,13 +93,15 @@ const activeFiltersCount = [
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          <span>Anexar Nuevo</span>
+          <span>Anexar Documento</span>
         </a>
       )}
     </div>
 
-    <!-- Barra de Búsqueda Principal Minimalista -->
+    <!-- Tarjeta Principal de Búsqueda y Filtros Rápidos -->
     <form id="search-form" method="GET" class="search-box-card card">
+      {typeId && <input type="hidden" name="typeId" id="hidden-type-id" value={typeId} />}
+
       <div class="main-search-row">
         <div class="search-input-wrapper">
           <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -82,50 +110,126 @@ const activeFiltersCount = [
           </svg>
           <input
             type="search"
+            id="main-q-input"
             name="q"
             value={q}
             class="main-search-input"
-            placeholder="Buscar por palabra clave, tema, persona o contenido completo... (ej: calendario, concurso, conectividad)"
+            placeholder="Buscar por palabra clave, resolución, escuela o contenido... (Presione / para enfocar)"
             autocomplete="off"
           />
+          {q ? (
+            <a href={buildFilterUrl({ q: undefined })} class="clear-search-btn" title="Limpiar texto buscado">
+              &times;
+            </a>
+          ) : (
+            <span class="kbd-shortcut search-kbd" title="Atajo de teclado">/</span>
+          )}
         </div>
 
-        <button type="submit" class="btn btn-dark btn-search">
+        <button type="submit" class="btn btn-primary btn-search">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
           <span>Buscar</span>
         </button>
 
         <button
           type="button"
           id="toggle-filters-btn"
-          class={`btn btn-secondary ${activeFiltersCount > 0 ? 'has-active' : ''}`}
+          class={`btn btn-secondary ${advancedFiltersCount > 0 ? 'has-active' : ''}`}
+          title="Abrir filtros específicos por campo"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
-          <span>Filtros</span>
-          {activeFiltersCount > 0 && <span class="badge badge-active-count">{activeFiltersCount}</span>}
+          <span>Más Filtros</span>
+          {advancedFiltersCount > 0 && <span class="badge badge-active-count">{advancedFiltersCount}</span>}
         </button>
       </div>
 
-      <!-- Panel Desplegable de Filtros Específicos -->
-      <div id="filters-panel" class="filters-panel" style={activeFiltersCount > 0 ? 'display: block;' : 'display: none;'}>
-        <div class="filters-grid">
-          <!-- Tipo de Documento -->
-          <div class="form-group">
-            <label class="form-label" for="filter-type">Tipo de Documento</label>
-            <select id="filter-type" name="typeId" class="form-select">
-              <option value="">Todos los tipos</option>
-              {types.map((t) => (
-                <option value={t.id} selected={typeId === t.id}>
-                  {t.name} ({t.code})
-                </option>
-              ))}
-            </select>
-          </div>
+      <!-- Barra de Píldoras de 1 Clic (Tipos de Documento + Orden Rápido) -->
+      <div class="quick-pills-bar">
+        <div class="chip-group" role="group" aria-label="Filtrar rápidamente por tipo de documento">
+          <span class="quick-filter-label">Tipo:</span>
+          <a
+            href={buildFilterUrl({ typeId: undefined })}
+            class={`chip ${!typeId ? 'active' : ''}`}
+          >
+            Todos
+          </a>
+          {types.map((t) => (
+            <a
+              href={buildFilterUrl({ typeId: typeId === t.id ? undefined : t.id })}
+              class={`chip ${typeId === t.id ? 'active' : ''}`}
+            >
+              <span>{t.name}</span>
+            </a>
+          ))}
+        </div>
 
+        <!-- Selector rápido de ordenamiento -->
+        <div class="quick-sort-box">
+          <label for="quick-order" class="quick-filter-label">Orden:</label>
+          <select
+            id="quick-order"
+            name="orderBy"
+            class="quick-sort-select"
+            onchange="this.form.submit()"
+          >
+            <option value="date_desc" selected={orderBy === 'date_desc'}>Más recientes</option>
+            <option value="relevance" selected={orderBy === 'relevance'}>Mayor relevancia</option>
+            <option value="year_desc" selected={orderBy === 'year_desc'}>Año (descendente)</option>
+            <option value="number_asc" selected={orderBy === 'number_asc'}>Número (A-Z)</option>
+            <option value="date_asc" selected={orderBy === 'date_asc'}>Más antiguos</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Chips de Filtros Avanzados Activos (Removibles con 1 clic) -->
+      {(selectedOrigin || number || year || caratula || extracto || contenido) && (
+        <div class="active-filters-strip">
+          <span class="quick-filter-label">Filtros aplicados:</span>
+          {selectedOrigin && (
+            <a href={buildFilterUrl({ originId: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Origen: {selectedOrigin.code} &times;
+            </a>
+          )}
+          {number && (
+            <a href={buildFilterUrl({ number: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              N°: {number} &times;
+            </a>
+          )}
+          {year && (
+            <a href={buildFilterUrl({ year: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Año: {year} &times;
+            </a>
+          )}
+          {caratula && (
+            <a href={buildFilterUrl({ caratula: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Carátula: "{caratula}" &times;
+            </a>
+          )}
+          {extracto && (
+            <a href={buildFilterUrl({ extracto: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Extracto: "{extracto}" &times;
+            </a>
+          )}
+          {contenido && (
+            <a href={buildFilterUrl({ contenido: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Contenido OCR: "{contenido}" &times;
+            </a>
+          )}
+          <a href="/consultas" class="clear-all-link">Limpiar todo</a>
+        </div>
+      )}
+
+      <!-- Panel Desplegable de Filtros Específicos -->
+      <div id="filters-panel" class="filters-panel" style={advancedFiltersCount > 0 ? 'display: block;' : 'display: none;'}>
+        <div class="filters-grid">
           <!-- Origen -->
           <div class="form-group">
-            <label class="form-label" for="filter-origin">Origen</label>
+            <label class="form-label" for="filter-origin">Origen / Repartición</label>
             <select id="filter-origin" name="originId" class="form-select">
               <option value="">Todos los orígenes</option>
               {originsList.map((o) => (
@@ -138,7 +242,7 @@ const activeFiltersCount = [
 
           <!-- Número -->
           <div class="form-group">
-            <label class="form-label" for="filter-number">Número</label>
+            <label class="form-label" for="filter-number">Número de Documento</label>
             <input
               type="text"
               id="filter-number"
@@ -166,58 +270,46 @@ const activeFiltersCount = [
 
           <!-- Carátula -->
           <div class="form-group">
-            <label class="form-label" for="filter-caratula">Carátula</label>
+            <label class="form-label" for="filter-caratula">Texto en Carátula</label>
             <input
               type="text"
               id="filter-caratula"
               name="caratula"
               value={caratula}
-              placeholder="Texto en carátula..."
+              placeholder="Palabras en el título..."
               class="form-input"
             />
           </div>
 
           <!-- Extracto -->
           <div class="form-group">
-            <label class="form-label" for="filter-extracto">Extracto</label>
+            <label class="form-label" for="filter-extracto">Texto en Extracto</label>
             <input
               type="text"
               id="filter-extracto"
               name="extracto"
               value={extracto}
-              placeholder="Texto en extracto..."
+              placeholder="Palabras en el resumen..."
               class="form-input"
             />
           </div>
 
           <!-- Contenido Escaneado / OCR -->
           <div class="form-group">
-            <label class="form-label" for="filter-contenido">Contenido del Documento</label>
+            <label class="form-label" for="filter-contenido">Texto Interno (OCR)</label>
             <input
               type="text"
               id="filter-contenido"
               name="contenido"
               value={contenido}
-              placeholder="Texto indexado en el PDF..."
+              placeholder="Palabras dentro del PDF..."
               class="form-input"
             />
-          </div>
-
-          <!-- Orden -->
-          <div class="form-group">
-            <label class="form-label" for="filter-order">Ordenar por</label>
-            <select id="filter-order" name="orderBy" class="form-select">
-              <option value="relevance" selected={orderBy === 'relevance'}>Mayor relevancia</option>
-              <option value="date_desc" selected={orderBy === 'date_desc'}>Más recientes primero</option>
-              <option value="date_asc" selected={orderBy === 'date_asc'}>Más antiguos primero</option>
-              <option value="year_desc" selected={orderBy === 'year_desc'}>Año descendente</option>
-              <option value="number_asc" selected={orderBy === 'number_asc'}>Número ascendente</option>
-            </select>
           </div>
         </div>
 
         <div class="filters-actions">
-          <a href="/consultas" class="btn btn-secondary btn-sm">Limpiar Filtros</a>
+          <a href="/consultas" class="btn btn-secondary btn-sm">Restablecer Todo</a>
           <button type="submit" class="btn btn-dark btn-sm">Aplicar Filtros</button>
         </div>
       </div>
@@ -226,8 +318,8 @@ const activeFiltersCount = [
     <!-- Resumen de Resultados -->
     <div class="results-meta">
       <span class="results-count">
-        Se encontraron <strong>{searchResult.total}</strong> documentos
-        {q && <span> para la búsqueda "<em>{q}</em>"</span>}
+        Mostrando <strong>{searchResult.items.length}</strong> de <strong>{searchResult.total}</strong> documentos encontrados
+        {q && <span> para <strong>"{q}"</strong></span>}
       </span>
       <span class="results-page-indicator">
         Página {searchResult.page} de {searchResult.totalPages || 1}
@@ -237,14 +329,16 @@ const activeFiltersCount = [
     <!-- Grilla / Tabla de Resultados -->
     {searchResult.items.length === 0 ? (
       <div class="card empty-state">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          <line x1="8" y1="11" x2="14" y2="11"></line>
-        </svg>
-        <h3 class="empty-title">No se encontraron documentos</h3>
+        <div class="empty-icon-circle">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </div>
+        <h3 class="empty-title">No encontramos documentos con esos criterios</h3>
         <p class="empty-desc">
-          Intente ajustando o quitando términos de búsqueda o filtros. SIDIDO no impone un mínimo de filtros obligatorios.
+          Pruebe con términos más generales o quite alguno de los filtros activos. Recuerde que la búsqueda ignora tildes y mayúsculas automáticamente.
         </p>
         <a href="/consultas" class="btn btn-secondary" style="margin-top: 1rem;">Ver todos los documentos</a>
       </div>
@@ -253,18 +347,18 @@ const activeFiltersCount = [
         <table class="table">
           <thead>
             <tr>
-              <th style="width: 130px;">Documento</th>
-              <th style="width: 140px;">Tipo / Origen</th>
-              <th>Carátula y Extracto</th>
-              <th style="width: 110px;">OCR</th>
-              <th style="width: 160px; text-align: right;">Acciones</th>
+              <th style="width: 150px;">N° / Año</th>
+              <th style="width: 155px;">Clasificación</th>
+              <th>Carátula y Síntesis</th>
+              <th style="width: 125px;">Estado OCR</th>
+              <th style="width: 210px; text-align: right;">Acciones Rápidas</th>
             </tr>
           </thead>
           <tbody>
             {searchResult.items.map((row: any) => (
-              <tr>
+              <tr class="doc-row">
                 <td>
-                  <a href={`/documentos/${row.id}`} class="doc-code-link">
+                  <a href={`/documentos/${row.id}`} class="doc-number-pill" title="Abrir ficha completa">
                     <strong>{row.number || 'S/N'}</strong>
                     <span class="doc-year">/{row.year || '----'}</span>
                   </a>
@@ -273,7 +367,9 @@ const activeFiltersCount = [
                   <div class="type-origin-cell">
                     <span class="badge badge-neutral">{row.type_name}</span>
                     {row.origin_code && (
-                      <span class="origin-sub">{row.origin_code}</span>
+                      <span class="origin-sub" title={row.origin_name || row.origin_code}>
+                        {row.origin_code}
+                      </span>
                     )}
                   </div>
                 </td>
@@ -289,52 +385,73 @@ const activeFiltersCount = [
                 </td>
                 <td>
                   {row.ocr_status === 'completed' && (
-                    <span class="badge badge-completed">Indexado</span>
+                    <span class="badge badge-completed">
+                      <span class="badge-dot"></span>
+                      Indexado
+                    </span>
                   )}
                   {row.ocr_status === 'processing' && (
-                    <span class="badge badge-pending">Procesando</span>
+                    <span class="badge badge-pending">
+                      <span class="badge-dot"></span>
+                      Procesando
+                    </span>
                   )}
                   {row.ocr_status === 'pending' && (
-                    <span class="badge badge-pending">En cola</span>
+                    <span class="badge badge-pending">
+                      <span class="badge-dot"></span>
+                      En cola
+                    </span>
                   )}
                   {row.ocr_status === 'failed' && (
-                    <span class="badge badge-failed">Falló</span>
+                    <span class="badge badge-failed">
+                      <span class="badge-dot"></span>
+                      Falló
+                    </span>
                   )}
                   {row.ocr_status === 'none' && (
-                    <span class="badge badge-neutral">S/A</span>
+                    <span class="badge badge-neutral">Sin PDF</span>
                   )}
                 </td>
                 <td style="text-align: right;">
                   <div class="actions-cell">
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm js-quick-preview"
+                      data-id={row.id}
+                      data-number={row.number || 'S/N'}
+                      data-year={row.year || '----'}
+                      data-type={row.type_name}
+                      data-origin={row.origin_code || ''}
+                      data-caratula={row.caratula || 'Sin carátula'}
+                      data-extracto={row.extracto || ''}
+                      data-has-file={row.file_key ? '1' : '0'}
+                      title="Vista rápida del PDF sin salir del listado"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <span>Vista Rápida</span>
+                    </button>
+
                     <a
                       href={`/documentos/${row.id}`}
                       class="btn btn-secondary btn-sm"
-                      title="Ver Ficha y PDF"
+                      title="Abrir ficha completa y texto OCR"
                     >
-                      Ver
+                      Ficha
                     </a>
+
                     {row.file_key && (
                       <a
                         href={`/api/documents/${row.id}/file?download=1`}
-                        class="btn btn-secondary btn-sm"
-                        title="Descargar PDF"
+                        class="btn btn-secondary btn-sm btn-icon"
+                        title="Descargar PDF directamente"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                           <polyline points="7 10 12 15 17 10"></polyline>
                           <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                      </a>
-                    )}
-                    {canCreateOrEdit(role) && (
-                      <a
-                        href={`/documentos/${row.id}/editar`}
-                        class="btn btn-secondary btn-sm"
-                        title="Editar"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                       </a>
                     )}
@@ -353,10 +470,7 @@ const activeFiltersCount = [
         <div class="pagination">
           {page > 1 ? (
             <a
-              href={`/consultas?${new URLSearchParams({
-                ...Object.fromEntries(url.searchParams),
-                page: String(page - 1),
-              }).toString()}`}
+              href={buildFilterUrl({ page: page - 1 })}
               class="btn btn-secondary btn-sm"
             >
               &larr; Anterior
@@ -366,15 +480,12 @@ const activeFiltersCount = [
           )}
 
           <span class="pagination-info">
-            Página {page} de {searchResult.totalPages}
+            Página <strong>{page}</strong> de <strong>{searchResult.totalPages}</strong>
           </span>
 
           {page < searchResult.totalPages ? (
             <a
-              href={`/consultas?${new URLSearchParams({
-                ...Object.fromEntries(url.searchParams),
-                page: String(page + 1),
-              }).toString()}`}
+              href={buildFilterUrl({ page: page + 1 })}
               class="btn btn-secondary btn-sm"
             >
               Siguiente &rarr;
@@ -386,11 +497,56 @@ const activeFiltersCount = [
       </div>
     )}
   </div>
+
+  <!-- Drawer Lateral de Vista Rápida (Sin salir del listado) -->
+  <div id="preview-drawer-backdrop" class="drawer-backdrop" style="display: none;" aria-hidden="true">
+    <aside class="preview-drawer" role="dialog" aria-labelledby="drawer-doc-title">
+      <div class="drawer-header">
+        <div class="drawer-meta-top">
+          <div class="drawer-badges">
+            <span id="drawer-type-badge" class="badge badge-neutral">Resolución</span>
+            <span id="drawer-origin-badge" class="badge badge-neutral">ME</span>
+            <span id="drawer-num-pill" class="doc-number-pill"><strong>1420</strong>/2024</span>
+          </div>
+          <h2 id="drawer-doc-title" class="drawer-title">Título del Documento</h2>
+        </div>
+        <button type="button" id="close-drawer-btn" class="drawer-close-btn" title="Cerrar vista rápida (Esc)">
+          &times;
+        </button>
+      </div>
+
+      <div id="drawer-extracto-box" class="drawer-extracto">
+        <p id="drawer-extracto-text"></p>
+      </div>
+
+      <div class="drawer-pdf-container">
+        <iframe id="drawer-pdf-iframe" class="drawer-pdf-frame" title="Vista previa del PDF"></iframe>
+        <div id="drawer-no-pdf" class="drawer-empty-pdf" style="display: none;">
+          <p>Este registro no posee archivo PDF escaneado adjunto.</p>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <a id="drawer-full-link" href="#" class="btn btn-dark">
+          Abrir Ficha Completa y Texto OCR &rarr;
+        </a>
+        <a id="drawer-download-link" href="#" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Descargar PDF</span>
+        </a>
+      </div>
+    </aside>
+  </div>
 </AppLayout>
 
 <script>
   const toggleBtn = document.getElementById('toggle-filters-btn');
   const filtersPanel = document.getElementById('filters-panel');
+  const mainSearchInput = document.getElementById('main-q-input') as HTMLInputElement;
 
   if (toggleBtn && filtersPanel) {
     toggleBtn.addEventListener('click', () => {
@@ -398,6 +554,100 @@ const activeFiltersCount = [
       filtersPanel.style.display = isVisible ? 'none' : 'block';
     });
   }
+
+  // Atajo "/" para enfocar rápidamente el buscador
+  document.addEventListener('keydown', (e) => {
+    if (
+      e.key === '/' &&
+      document.activeElement !== mainSearchInput &&
+      !['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement as HTMLElement)?.tagName || '')
+    ) {
+      e.preventDefault();
+      mainSearchInput?.focus();
+      mainSearchInput?.select();
+    }
+  });
+
+  // Lógica del Drawer de Vista Rápida
+  const backdrop = document.getElementById('preview-drawer-backdrop') as HTMLElement;
+  const closeDrawerBtn = document.getElementById('close-drawer-btn') as HTMLElement;
+  const drawerTitle = document.getElementById('drawer-doc-title') as HTMLElement;
+  const drawerType = document.getElementById('drawer-type-badge') as HTMLElement;
+  const drawerOrigin = document.getElementById('drawer-origin-badge') as HTMLElement;
+  const drawerNumPill = document.getElementById('drawer-num-pill') as HTMLElement;
+  const drawerExtractoBox = document.getElementById('drawer-extracto-box') as HTMLElement;
+  const drawerExtractoText = document.getElementById('drawer-extracto-text') as HTMLElement;
+  const drawerIframe = document.getElementById('drawer-pdf-iframe') as HTMLIFrameElement;
+  const drawerNoPdf = document.getElementById('drawer-no-pdf') as HTMLElement;
+  const drawerFullLink = document.getElementById('drawer-full-link') as HTMLAnchorElement;
+  const drawerDownloadLink = document.getElementById('drawer-download-link') as HTMLAnchorElement;
+
+  function openQuickPreview(btn: HTMLElement) {
+    const id = btn.dataset.id || '';
+    const num = btn.dataset.number || 'S/N';
+    const year = btn.dataset.year || '----';
+    const type = btn.dataset.type || 'Documento';
+    const origin = btn.dataset.origin || '';
+    const caratula = btn.dataset.caratula || 'Sin carátula';
+    const extracto = btn.dataset.extracto || '';
+    const hasFile = btn.dataset.hasFile === '1';
+
+    drawerTitle.textContent = caratula;
+    drawerType.textContent = type;
+    if (origin) {
+      drawerOrigin.textContent = origin;
+      drawerOrigin.style.display = 'inline-flex';
+    } else {
+      drawerOrigin.style.display = 'none';
+    }
+    drawerNumPill.innerHTML = `<strong>${num}</strong>/${year}`;
+
+    if (extracto) {
+      drawerExtractoText.textContent = extracto;
+      drawerExtractoBox.style.display = 'block';
+    } else {
+      drawerExtractoBox.style.display = 'none';
+    }
+
+    drawerFullLink.href = `/documentos/${id}`;
+
+    if (hasFile) {
+      drawerIframe.src = `/api/documents/${id}/file`;
+      drawerIframe.style.display = 'block';
+      drawerNoPdf.style.display = 'none';
+      drawerDownloadLink.href = `/api/documents/${id}/file?download=1`;
+      drawerDownloadLink.style.display = 'inline-flex';
+    } else {
+      drawerIframe.src = 'about:blank';
+      drawerIframe.style.display = 'none';
+      drawerNoPdf.style.display = 'flex';
+      drawerDownloadLink.style.display = 'none';
+    }
+
+    backdrop.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeQuickPreview() {
+    backdrop.style.display = 'none';
+    drawerIframe.src = 'about:blank';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.js-quick-preview').forEach((btn) => {
+    btn.addEventListener('click', () => openQuickPreview(btn as HTMLElement));
+  });
+
+  closeDrawerBtn?.addEventListener('click', closeQuickPreview);
+  backdrop?.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeQuickPreview();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && backdrop?.style.display === 'flex') {
+      closeQuickPreview();
+    }
+  });
 </script>
 
 <style>
@@ -416,28 +666,30 @@ const activeFiltersCount = [
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.55rem;
     font-weight: 700;
     color: var(--sj-charcoal);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
   .page-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .search-box-card {
-    padding: 1rem;
+    padding: 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-light);
   }
 
   .main-search-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.65rem;
   }
 
   .search-input-wrapper {
@@ -449,40 +701,126 @@ const activeFiltersCount = [
 
   .search-icon {
     position: absolute;
-    left: 0.875rem;
+    left: 0.95rem;
     color: var(--text-muted);
     pointer-events: none;
   }
 
   .main-search-input {
     width: 100%;
-    padding: 0.625rem 1rem 0.625rem 2.625rem;
-    font-size: 0.9375rem;
-    border: 1px solid var(--border-light);
+    padding: 0.72rem 2.5rem 0.72rem 2.75rem;
+    font-size: 0.95rem;
+    border: 1.5px solid var(--border-light);
     border-radius: var(--radius-md);
     background-color: var(--bg-surface);
     color: var(--text-primary);
+    transition: all var(--transition-fast);
+  }
+
+  .main-search-input:hover {
+    border-color: var(--border-medium);
   }
 
   .main-search-input:focus {
-    border-color: var(--sj-charcoal);
+    border-color: var(--sj-red);
     outline: none;
-    box-shadow: 0 0 0 1px var(--sj-charcoal);
+    box-shadow: var(--shadow-focus);
+  }
+
+  .search-kbd {
+    position: absolute;
+    right: 0.85rem;
+    pointer-events: none;
+  }
+
+  .clear-search-btn {
+    position: absolute;
+    right: 0.75rem;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: var(--bg-alt);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .clear-search-btn:hover {
+    background-color: var(--sj-red-subtle);
+    color: var(--sj-red);
   }
 
   .btn-search {
-    padding: 0.625rem 1.25rem;
+    padding: 0.72rem 1.35rem;
+    font-weight: 600;
   }
 
   .has-active {
     border-color: var(--sj-red);
     color: var(--sj-red);
+    background-color: var(--sj-red-subtle);
   }
 
   .badge-active-count {
     background-color: var(--sj-red);
     color: white;
-    margin-left: 0.25rem;
+    margin-left: 0.15rem;
+    padding: 0.05rem 0.45rem;
+  }
+
+  /* Barra de Píldoras Rápidas (1 Clic) */
+  .quick-pills-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-top: 0.25rem;
+  }
+
+  .quick-filter-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 0.2rem;
+  }
+
+  .quick-sort-box {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .quick-sort-select {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sj-charcoal);
+    background-color: var(--bg-alt);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 0.28rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .active-filters-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--border-light);
+  }
+
+  .clear-all-link {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--sj-red);
+    margin-left: 0.35rem;
+    text-decoration: underline;
   }
 
   .filters-panel {
@@ -500,52 +838,51 @@ const activeFiltersCount = [
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
-    margin-top: 1.25rem;
+    margin-top: 1.15rem;
   }
 
   .results-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.875rem;
-    color: var(--text-muted);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
     padding: 0 0.25rem;
-  }
-
-  .doc-code-link {
-    font-size: 0.9375rem;
-    color: var(--sj-charcoal);
-  }
-  .doc-code-link:hover {
-    color: var(--sj-red);
   }
 
   .doc-year {
     color: var(--text-muted);
+    font-weight: 400;
   }
 
   .type-origin-cell {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    align-items: flex-start;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
   }
 
   .origin-sub {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 500;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
   }
 
   .doc-content-cell {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.28rem;
   }
 
   .doc-title-link {
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 0.925rem;
     color: var(--sj-charcoal);
+    transition: color var(--transition-fast);
   }
   .doc-title-link:hover {
     color: var(--sj-red);
@@ -553,14 +890,14 @@ const activeFiltersCount = [
 
   .doc-snippet {
     font-size: 0.8125rem;
-    color: #4B5563;
-    line-height: 1.4;
+    color: var(--text-secondary);
+    line-height: 1.45;
   }
 
   .actions-cell {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.35rem;
   }
 
   .empty-state {
@@ -571,39 +908,166 @@ const activeFiltersCount = [
     align-items: center;
   }
 
-  .empty-icon {
-    color: #9CA3AF;
-    margin-bottom: 0.75rem;
+  .empty-icon-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: var(--bg-alt);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
   }
 
   .empty-title {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.15rem;
+    font-weight: 700;
     color: var(--sj-charcoal);
   }
 
   .empty-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
-    max-width: 420px;
-    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    max-width: 440px;
+    margin-top: 0.35rem;
   }
 
   .pagination-wrapper {
     display: flex;
     justify-content: center;
-    margin-top: 1rem;
+    margin-top: 0.75rem;
   }
 
   .pagination {
     display: flex;
     align-items: center;
     gap: 1rem;
+    background-color: var(--bg-surface);
+    padding: 0.45rem 0.85rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-xs);
   }
 
   .pagination-info {
+    font-size: 0.825rem;
+    color: var(--text-secondary);
+  }
+
+  /* Drawer Lateral de Vista Rápida */
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(29, 37, 45, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .preview-drawer {
+    width: 100%;
+    max-width: 680px;
+    height: 100vh;
+    background-color: var(--bg-surface);
+    box-shadow: -8px 0 28px rgba(29, 37, 45, 0.18);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.18s ease-out;
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(30px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .drawer-header {
+    padding: 1.15rem 1.35rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .drawer-meta-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .drawer-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .drawer-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
+    line-height: 1.3;
+  }
+
+  .drawer-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-alt);
+    color: var(--text-secondary);
+    font-size: 1.35rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .drawer-close-btn:hover {
+    background-color: var(--sj-red-subtle);
+    color: var(--sj-red);
+  }
+
+  .drawer-extracto {
+    padding: 0.75rem 1.35rem;
+    background-color: #F8FAFC;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .drawer-pdf-container {
+    flex: 1;
+    background-color: #525659;
+    position: relative;
+  }
+
+  .drawer-pdf-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .drawer-empty-pdf {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #E2E8F0;
     font-size: 0.875rem;
-    color: var(--text-muted);
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .drawer-footer {
+    padding: 0.9rem 1.35rem;
+    border-top: 1px solid var(--border-light);
+    background-color: var(--bg-surface);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   @media (max-width: 768px) {
@@ -612,6 +1076,10 @@ const activeFiltersCount = [
     }
     .search-input-wrapper {
       min-width: 100%;
+    }
+    .drawer-footer {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 </style>

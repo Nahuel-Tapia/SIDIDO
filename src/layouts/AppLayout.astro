@@ -13,12 +13,19 @@ const user = Astro.locals.user;
 const role = user?.role || 'consulta';
 
 const roleLabels: Record<string, { label: string; class: string }> = {
-  admin: { label: 'Administrador', class: 'badge-failed' }, // Usamos color rojo suave para admin
-  operador: { label: 'Operador', class: 'badge-pending' },   // Naranja suave para operador
-  consulta: { label: 'Consulta', class: 'badge-neutral' },   // Gris neutro para consulta
+  admin: { label: 'Administrador', class: 'badge-failed' },
+  operador: { label: 'Operador', class: 'badge-pending' },
+  consulta: { label: 'Consulta', class: 'badge-neutral' },
 };
 
 const userBadge = roleLabels[role] || roleLabels.consulta;
+const fullName = user?.fullName || 'Usuario';
+const initials = fullName
+  .split(' ')
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0]?.toUpperCase())
+  .join('') || 'U';
 ---
 
 <!doctype html>
@@ -30,19 +37,25 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body class="app-body">
+    <!-- Banda Superior Institucional (Sol de San Juan) -->
+    <div class="brand-top-bar" aria-hidden="true"></div>
+
     <!-- Navbar Oficial Superior -->
     <header class="app-header">
       <div class="header-inner">
         <!-- Logo y Sistema -->
         <div class="header-brand">
-          <a href="/consultas" class="brand-link" title="Ir al inicio">
+          <a href="/consultas" class="brand-link" title="Ir al inicio de Consultas">
             <LogoSanJuan variant="horizontal" size="sm" theme="color" />
           </a>
           <div class="brand-separator"></div>
-          <div class="system-badge">
-            <span class="system-acronym">SIDIDO</span>
-            <span class="system-dept">Educación</span>
-          </div>
+          <a href="/consultas" class="system-badge">
+            <div class="system-title-row">
+              <span class="system-acronym">SIDIDO</span>
+              <span class="system-version">2.0</span>
+            </div>
+            <span class="system-dept">Ministerio de Educación</span>
+          </a>
         </div>
 
         <!-- Navegación Principal -->
@@ -74,26 +87,29 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
           )}
 
           {canAdmin(role) && (
-            <div class="nav-dropdown-container">
-              <a
-                href="/admin"
-                class={`nav-item ${activeNav === 'admin' ? 'active' : ''}`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <span>Administración</span>
-              </a>
-            </div>
+            <a
+              href="/admin"
+              class={`nav-item ${activeNav === 'admin' ? 'active' : ''}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              </svg>
+              <span>Administración</span>
+            </a>
           )}
         </nav>
 
         <!-- Área de Usuario y Logout -->
         <div class="header-user">
-          <div class="user-meta">
-            <span class="user-name">{user?.fullName || 'Usuario'}</span>
-            <span class={`badge ${userBadge.class}`}>{userBadge.label}</span>
+          <div class="user-profile-pill">
+            <div class="user-avatar" aria-hidden="true">{initials}</div>
+            <div class="user-meta">
+              <span class="user-name">{fullName}</span>
+              <span class={`badge ${userBadge.class} role-badge`}>{userBadge.label}</span>
+            </div>
           </div>
 
           <a href="/logout" class="btn btn-secondary btn-sm btn-logout" title="Cerrar Sesión">
@@ -116,8 +132,11 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
     <!-- Footer Institucional Discreto -->
     <footer class="app-footer">
       <div class="footer-inner">
-        <span>Ministerio de Educación — Gobierno de San Juan</span>
-        <span>SIDIDO 2.0 • Sistema Integral de Documentos Digitalizados</span>
+        <div class="footer-brand-info">
+          <span class="footer-dot"></span>
+          <span>Ministerio de Educación — Gobierno de San Juan</span>
+        </div>
+        <span>SIDIDO 2.0 • Sistema Integral de Gestión y Consulta Documental</span>
       </div>
     </footer>
   </body>
@@ -131,19 +150,29 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
     min-height: 100vh;
   }
 
-  .app-header {
-    background-color: var(--bg-surface);
-    border-bottom: 1px solid var(--border-light);
+  .brand-top-bar {
+    height: 4px;
+    width: 100%;
+    background: var(--sj-brand-gradient);
     position: sticky;
     top: 0;
+    z-index: 60;
+  }
+
+  .app-header {
+    background-color: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-light);
+    position: sticky;
+    top: 4px;
     z-index: 50;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-xs);
   }
 
   .header-inner {
-    max-width: 1400px;
+    max-width: 1440px;
     margin: 0 auto;
-    padding: 0.75rem 1.5rem;
+    padding: 0.65rem 1.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -153,86 +182,139 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
   .header-brand {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.9rem;
   }
 
   .brand-link {
     display: flex;
     align-items: center;
+    transition: opacity var(--transition-fast);
+  }
+  .brand-link:hover {
+    opacity: 0.9;
   }
 
   .brand-separator {
     width: 1px;
-    height: 28px;
+    height: 30px;
     background-color: var(--border-light);
   }
 
   .system-badge {
     display: flex;
     flex-direction: column;
-    line-height: 1.1;
+    line-height: 1.15;
+  }
+
+  .system-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
   .system-acronym {
     font-size: 1.125rem;
     font-weight: 700;
     color: var(--sj-charcoal);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+  }
+
+  .system-version {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    background-color: var(--bg-alt);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
   }
 
   .system-dept {
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.7rem;
+    font-weight: 700;
     color: var(--sj-red);
     text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
   .app-nav {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.375rem;
+    background-color: var(--bg-alt);
+    padding: 0.25rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
   }
 
   .nav-item {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 0.875rem;
+    padding: 0.45rem 0.95rem;
     border-radius: var(--radius-md);
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--sj-charcoal);
-    transition: all 0.15s ease;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
   }
 
   .nav-item:hover {
-    background-color: var(--bg-alt);
-    color: var(--sj-red);
+    color: var(--sj-charcoal);
+    background-color: rgba(255, 255, 255, 0.6);
   }
 
   .nav-item.active {
-    background-color: var(--sj-red-subtle);
+    background-color: var(--bg-surface);
     color: var(--sj-red);
     font-weight: 600;
+    box-shadow: var(--shadow-xs);
   }
 
   .header-user {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.875rem;
+  }
+
+  .user-profile-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background-color: var(--sj-charcoal);
+    color: var(--text-inverted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
   }
 
   .user-meta {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    line-height: 1.2;
+    align-items: flex-start;
+    line-height: 1.15;
+    gap: 0.15rem;
   }
 
   .user-name {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     color: var(--sj-charcoal);
+  }
+
+  .role-badge {
+    font-size: 0.68rem;
+    padding: 0.08rem 0.45rem;
   }
 
   .btn-logout {
@@ -243,10 +325,10 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
 
   .app-main {
     flex: 1;
-    max-width: 1400px;
+    max-width: 1440px;
     width: 100%;
     margin: 0 auto;
-    padding: 1.75rem 1.5rem;
+    padding: 1.75rem 1.5rem 2.5rem;
   }
 
   .app-footer {
@@ -257,20 +339,36 @@ const userBadge = roleLabels[role] || roleLabels.consulta;
   }
 
   .footer-inner {
-    max-width: 1400px;
+    max-width: 1440px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 0.75rem;
     color: var(--text-muted);
   }
 
-  @media (max-width: 768px) {
+  .footer-brand-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .footer-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sj-brand-gradient);
+  }
+
+  @media (max-width: 900px) {
     .header-inner {
       flex-wrap: wrap;
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 1rem;
     }
-    .brand-separator, .system-badge {
+    .brand-separator, .system-badge, .user-meta {
       display: none;
     }
     .logout-text {

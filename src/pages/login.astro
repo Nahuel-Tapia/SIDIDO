@@ -5,11 +5,16 @@ import LogoSanJuan from '../components/brand/LogoSanJuan.astro';
 
 <AuthLayout title="Iniciar Sesión - SIDIDO">
   <div class="card login-card">
+    <div class="login-brand-bar" aria-hidden="true"></div>
+
     <div class="login-header">
       <LogoSanJuan variant="vertical" size="lg" theme="color" />
       <div class="header-titles">
-        <h1 class="system-name">SIDIDO</h1>
-        <p class="system-desc">Sistema de Gestión y Consulta Documental</p>
+        <div class="title-badge-row">
+          <h1 class="system-name">SIDIDO</h1>
+          <span class="version-pill">2.0</span>
+        </div>
+        <p class="system-desc">Sistema Integral de Gestión y Consulta Documental</p>
         <span class="ministry-tag">Ministerio de Educación</span>
       </div>
     </div>
@@ -19,36 +24,76 @@ import LogoSanJuan from '../components/brand/LogoSanJuan.astro';
 
       <div class="form-group">
         <label for="username" class="form-label">Usuario</label>
-        <input
-          type="text"
-          id="username"
-          name="username"
-          class="form-input"
-          placeholder="Ingrese su nombre de usuario"
-          required
-          autofocus
-          autocomplete="username"
-        />
+        <div class="input-icon-wrapper">
+          <svg class="field-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            class="form-input input-with-icon"
+            placeholder="Ingrese su usuario institucional"
+            required
+            autofocus
+            autocomplete="username"
+          />
+        </div>
       </div>
 
       <div class="form-group">
         <label for="password" class="form-label">Contraseña</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          class="form-input"
-          placeholder="••••••••"
-          required
-          autocomplete="current-password"
-        />
+        <div class="input-icon-wrapper">
+          <svg class="field-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            class="form-input input-with-icon input-with-toggle"
+            placeholder="••••••••"
+            required
+            autocomplete="current-password"
+          />
+          <button
+            type="button"
+            id="toggle-pwd-btn"
+            class="pwd-toggle-btn"
+            title="Mostrar u ocultar contraseña"
+            aria-label="Mostrar u ocultar contraseña"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <button type="submit" id="submit-btn" class="btn btn-primary btn-submit">
         <span class="btn-text">Ingresar al Sistema</span>
-        <span class="btn-spinner" style="display: none;">Verificando...</span>
+        <span class="btn-spinner" style="display: none;">Verificando credenciales...</span>
       </button>
     </form>
+
+    <!-- Acceso Rápido para Pruebas / Demostración -->
+    <div class="demo-access-box">
+      <span class="demo-label">Acceso rápido de prueba (1 clic):</span>
+      <div class="demo-chips">
+        <button type="button" class="chip demo-user-btn" data-user="admin" data-pass="admin123">
+          Administrador
+        </button>
+        <button type="button" class="chip demo-user-btn" data-user="operador" data-pass="operador123">
+          Operador
+        </button>
+        <button type="button" class="chip demo-user-btn" data-user="consulta" data-pass="consulta123">
+          Consulta
+        </button>
+      </div>
+    </div>
 
     <div class="login-footer">
       <p class="security-notice">
@@ -64,6 +109,24 @@ import LogoSanJuan from '../components/brand/LogoSanJuan.astro';
   const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
   const btnText = submitBtn.querySelector('.btn-text') as HTMLElement;
   const btnSpinner = submitBtn.querySelector('.btn-spinner') as HTMLElement;
+  const usernameInput = document.getElementById('username') as HTMLInputElement;
+  const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const togglePwdBtn = document.getElementById('toggle-pwd-btn') as HTMLButtonElement;
+
+  togglePwdBtn?.addEventListener('click', () => {
+    const isPwd = passwordInput.type === 'password';
+    passwordInput.type = isPwd ? 'text' : 'password';
+  });
+
+  document.querySelectorAll('.demo-user-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const u = btn.getAttribute('data-user') || '';
+      const p = btn.getAttribute('data-pass') || '';
+      usernameInput.value = u;
+      passwordInput.value = p;
+      form.requestSubmit();
+    });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -106,11 +169,22 @@ import LogoSanJuan from '../components/brand/LogoSanJuan.astro';
 
 <style>
   .login-card {
-    padding: 2.25rem 2rem;
-    border-radius: var(--radius-lg);
+    padding: 2.5rem 2.25rem 2rem;
+    border-radius: var(--radius-xl);
     background-color: var(--bg-surface);
     border: 1px solid var(--border-light);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-brand-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: var(--sj-brand-gradient);
   }
 
   .login-header {
@@ -118,63 +192,144 @@ import LogoSanJuan from '../components/brand/LogoSanJuan.astro';
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 1.25rem;
-    margin-bottom: 2rem;
+    gap: 1.15rem;
+    margin-bottom: 1.75rem;
   }
 
   .header-titles {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .title-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
   }
 
   .system-name {
-    font-size: 1.625rem;
+    font-size: 1.75rem;
     font-weight: 700;
     color: var(--sj-charcoal);
     letter-spacing: -0.02em;
   }
 
+  .version-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background-color: var(--sj-red-subtle);
+    color: var(--sj-red);
+    border: 1px solid var(--sj-red-border);
+  }
+
   .system-desc {
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .ministry-tag {
     display: inline-block;
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 600;
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
     color: var(--sj-red);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
   }
 
   .login-form {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1.15rem;
+  }
+
+  .input-icon-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .field-icon {
+    position: absolute;
+    left: 0.85rem;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .input-with-icon {
+    padding-left: 2.5rem;
+  }
+
+  .input-with-toggle {
+    padding-right: 2.5rem;
+  }
+
+  .pwd-toggle-btn {
+    position: absolute;
+    right: 0.65rem;
+    color: var(--text-muted);
+    padding: 0.25rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pwd-toggle-btn:hover {
+    color: var(--sj-charcoal);
+    background-color: var(--bg-alt);
   }
 
   .btn-submit {
-    margin-top: 0.5rem;
+    margin-top: 0.35rem;
     padding: 0.75rem;
     font-size: 0.9375rem;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .alert-error {
     background-color: var(--sj-red-subtle);
     color: #991B1B;
-    border: 1px solid #FCA5A5;
-    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--sj-red-border);
+    padding: 0.65rem 0.875rem;
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  .demo-access-box {
+    margin-top: 1.5rem;
+    padding: 0.85rem;
+    background-color: var(--bg-alt);
+    border: 1px dashed var(--border-medium);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .demo-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .demo-chips {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .login-footer {
-    margin-top: 2rem;
-    padding-top: 1.25rem;
+    margin-top: 1.35rem;
+    padding-top: 1rem;
     border-top: 1px solid var(--border-light);
     text-align: center;
   }

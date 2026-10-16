@@ -1,5 +1,6 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
+import AdminNav from '../../components/admin/AdminNav.astro';
 import { getOrigins } from '../../server/services/catalog';
 import { canAdmin } from '../../server/auth/permissions';
 
@@ -11,9 +12,10 @@ const originsList = await getOrigins(false);
 
 <AppLayout title="Orígenes y Reparticiones" activeNav="admin">
   <div class="catalog-page">
+    <AdminNav activeTab="origenes" />
+
     <div class="page-header">
       <div>
-        <a href="/admin" class="back-link">&larr; Volver al Panel</a>
         <h1 class="page-title">Gestión de Orígenes y Reparticiones</h1>
         <p class="page-desc">ABM de dependencias emisoras (ej: ME, DGEP, DGES, SAF).</p>
       </div>
@@ -51,31 +53,34 @@ const originsList = await getOrigins(false);
           <tr>
             <th style="width: 120px;">Sigla</th>
             <th>Nombre de la Repartición</th>
-            <th style="width: 120px;">Estado</th>
-            <th style="width: 140px; text-align: right;">Acciones</th>
+            <th style="width: 130px;">Estado</th>
+            <th style="width: 180px; text-align: right;">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {originsList.map((o) => (
             <tr>
-              <td><strong>{o.code}</strong></td>
-              <td>{o.name}</td>
+              <td><span class="doc-number-pill"><strong>{o.code}</strong></span></td>
+              <td><strong>{o.name}</strong></td>
               <td>
                 {o.active ? (
-                  <span class="badge badge-completed">Activo</span>
+                  <span class="badge badge-completed"><span class="badge-dot"></span>Activo</span>
                 ) : (
                   <span class="badge badge-neutral">Inactivo</span>
                 )}
               </td>
               <td style="text-align: right;">
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm toggle-btn"
-                  data-id={o.id}
-                  data-active={o.active ? 'false' : 'true'}
-                >
-                  {o.active ? 'Desactivar' : 'Activar'}
-                </button>
+                <div style="display: inline-flex; gap: 0.4rem;">
+                  <a href={`/consultas?originId=${o.id}`} class="btn btn-secondary btn-sm">Ver Docs</a>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm toggle-btn"
+                    data-id={o.id}
+                    data-active={o.active ? 'false' : 'true'}
+                  >
+                    {o.active ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -138,12 +143,11 @@ const originsList = await getOrigins(false);
 </script>
 
 <style>
-  .catalog-page { display: flex; flex-direction: column; gap: 1.5rem; }
+  .catalog-page { display: flex; flex-direction: column; gap: 1.35rem; }
   .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-  .back-link { font-size: 0.8125rem; color: var(--text-muted); }
-  .page-title { font-size: 1.375rem; font-weight: 700; color: var(--sj-charcoal); }
-  .page-desc { font-size: 0.875rem; color: var(--text-muted); }
-  .modal-overlay { position: fixed; inset: 0; background-color: rgba(29, 37, 45, 0.4); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+  .page-title { font-size: 1.45rem; font-weight: 700; color: var(--sj-charcoal); }
+  .page-desc { font-size: 0.875rem; color: var(--text-secondary); }
+  .modal-overlay { position: fixed; inset: 0; background-color: rgba(29, 37, 45, 0.45); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
   .modal-card { width: 100%; max-width: 440px; }
   .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem; }
   .modal-form { display: flex; flex-direction: column; gap: 1rem; }
