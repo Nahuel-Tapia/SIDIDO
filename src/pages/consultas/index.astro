@@ -14,6 +14,9 @@ const typeId = url.searchParams.get('typeId') ? Number(url.searchParams.get('typ
 const originId = url.searchParams.get('originId') ? Number(url.searchParams.get('originId')) : undefined;
 const number = url.searchParams.get('number') || '';
 const year = url.searchParams.get('year') ? Number(url.searchParams.get('year')) : undefined;
+const expediente = url.searchParams.get('expediente') || '';
+const dni = url.searchParams.get('dni') || '';
+const persona = url.searchParams.get('persona') || '';
 const caratula = url.searchParams.get('caratula') || '';
 const extracto = url.searchParams.get('extracto') || '';
 const contenido = url.searchParams.get('contenido') || '';
@@ -31,6 +34,9 @@ const searchResult = await searchDocuments({
   originId,
   number,
   year,
+  expediente,
+  dni,
+  persona,
   caratula,
   extracto,
   contenido,
@@ -43,6 +49,9 @@ const advancedFiltersCount = [
   originId,
   number,
   year,
+  expediente,
+  dni,
+  persona,
   caratula,
   extracto,
   contenido,
@@ -53,6 +62,9 @@ const activeFiltersCount = [
   originId,
   number,
   year,
+  expediente,
+  dni,
+  persona,
   caratula,
   extracto,
   contenido,
@@ -83,7 +95,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
       <div>
         <h1 class="page-title">Consulta de Expedientes y Documentos</h1>
         <p class="page-desc">
-          Busque por número, año, tema o cualquier palabra dentro del documento escaneado.
+          Busque por DNI, nombre asociado, número, año, escuela o cualquier palabra detectada en el PDF.
         </p>
       </div>
 
@@ -114,7 +126,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
             name="q"
             value={q}
             class="main-search-input"
-            placeholder="Buscar por palabra clave, resolución, escuela o contenido... (Presione / para enfocar)"
+            placeholder="Buscar por DNI, nombre de docente/agente, resolución, escuela o contenido... (Presione /)"
             autocomplete="off"
           />
           {q ? (
@@ -138,7 +150,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
           type="button"
           id="toggle-filters-btn"
           class={`btn btn-secondary ${advancedFiltersCount > 0 ? 'has-active' : ''}`}
-          title="Abrir filtros específicos por campo"
+          title="Abrir filtros específicos por DNI, Persona, Número o Año"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -187,9 +199,24 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
       </div>
 
       <!-- Chips de Filtros Avanzados Activos (Removibles con 1 clic) -->
-      {(selectedOrigin || number || year || caratula || extracto || contenido) && (
+      {(selectedOrigin || number || year || expediente || dni || persona || caratula || extracto || contenido) && (
         <div class="active-filters-strip">
           <span class="quick-filter-label">Filtros aplicados:</span>
+          {expediente && (
+            <a href={buildFilterUrl({ expediente: undefined })} class="chip chip-active-filter" title="Quitar filtro de expediente">
+              Expte: {expediente} &times;
+            </a>
+          )}
+          {dni && (
+            <a href={buildFilterUrl({ dni: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              DNI: {dni} &times;
+            </a>
+          )}
+          {persona && (
+            <a href={buildFilterUrl({ persona: undefined })} class="chip chip-active-filter" title="Quitar filtro">
+              Persona: "{persona}" &times;
+            </a>
+          )}
           {selectedOrigin && (
             <a href={buildFilterUrl({ originId: undefined })} class="chip chip-active-filter" title="Quitar filtro">
               Origen: {selectedOrigin.code} &times;
@@ -227,6 +254,32 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
       <!-- Panel Desplegable de Filtros Específicos -->
       <div id="filters-panel" class="filters-panel" style={advancedFiltersCount > 0 ? 'display: block;' : 'display: none;'}>
         <div class="filters-grid">
+          <!-- DNI / CUIL -->
+          <div class="form-group">
+            <label class="form-label" for="filter-dni">DNI / CUIL Detectado</label>
+            <input
+              type="text"
+              id="filter-dni"
+              name="dni"
+              value={dni}
+              placeholder="Ej: 28.456.789 o 28456789"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Persona / Nombre Asociado -->
+          <div class="form-group">
+            <label class="form-label" for="filter-persona">Nombre Asociado (Agente/Docente)</label>
+            <input
+              type="text"
+              id="filter-persona"
+              name="persona"
+              value={persona}
+              placeholder="Ej: Quiroga, Sarmiento..."
+              class="form-input"
+            />
+          </div>
+
           <!-- Origen -->
           <div class="form-group">
             <label class="form-label" for="filter-origin">Origen / Repartición</label>
@@ -238,6 +291,19 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
                 </option>
               ))}
             </select>
+          </div>
+
+          <!-- Expediente -->
+          <div class="form-group">
+            <label class="form-label" for="filter-expediente">N° de Expediente</label>
+            <input
+              type="text"
+              id="filter-expediente"
+              name="expediente"
+              value={expediente}
+              placeholder="Ej: 300-028554-2026"
+              class="form-input"
+            />
           </div>
 
           <!-- Número -->
@@ -362,6 +428,18 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
                     <strong>{row.number || 'S/N'}</strong>
                     <span class="doc-year">/{row.year || '----'}</span>
                   </a>
+                  {row.expediente && (
+                    <div style="margin-top: 4px;">
+                      <a
+                        href={buildFilterUrl({ expediente: row.expediente })}
+                        class="badge"
+                        style="font-size: 0.72rem; font-family: var(--font-mono); font-weight: 600; color: #1D252D; background: #FFF4E5; border: 1px solid #FFD8A8; text-decoration: none; display: inline-block; padding: 2px 6px;"
+                        title={`Filtrar por Expediente ${row.expediente}`}
+                      >
+                        Exp: {row.expediente}
+                      </a>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <div class="type-origin-cell">
@@ -380,6 +458,30 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
                     </a>
                     {row.headline && (
                       <p class="doc-snippet" set:html={row.headline}></p>
+                    )}
+                    {row.extracted_metadata && (
+                      (row.extracted_metadata.dnis?.length > 0 || row.extracted_metadata.people?.length > 0) && (
+                        <div class="entity-badges-row">
+                          {(row.extracted_metadata.dnis || []).slice(0, 3).map((d: string) => (
+                            <a
+                              href={buildFilterUrl({ dni: d })}
+                              class="entity-pill entity-pill-dni"
+                              title={`Filtrar todos los documentos con DNI ${d}`}
+                            >
+                              DNI {d}
+                            </a>
+                          ))}
+                          {(row.extracted_metadata.people || []).slice(0, 3).map((p: string) => (
+                            <a
+                              href={buildFilterUrl({ persona: p })}
+                              class="entity-pill entity-pill-person"
+                              title={`Filtrar todos los documentos asociados a ${p}`}
+                            >
+                              {p}
+                            </a>
+                          ))}
+                        </div>
+                      )
                     )}
                   </div>
                 </td>
@@ -424,6 +526,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
                       data-origin={row.origin_code || ''}
                       data-caratula={row.caratula || 'Sin carátula'}
                       data-extracto={row.extracto || ''}
+                      data-expediente={row.expediente || ''}
                       data-has-file={row.file_key ? '1' : '0'}
                       title="Vista rápida del PDF sin salir del listado"
                     >
@@ -507,6 +610,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
             <span id="drawer-type-badge" class="badge badge-neutral">Resolución</span>
             <span id="drawer-origin-badge" class="badge badge-neutral">ME</span>
             <span id="drawer-num-pill" class="doc-number-pill"><strong>1420</strong>/2024</span>
+            <span id="drawer-exp-badge" class="badge" style="display: none; background: #FFF4E5; color: #1D252D; border: 1px solid #FFD8A8; font-weight: 600; font-family: var(--font-mono);"></span>
           </div>
           <h2 id="drawer-doc-title" class="drawer-title">Título del Documento</h2>
         </div>
@@ -575,6 +679,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
   const drawerType = document.getElementById('drawer-type-badge') as HTMLElement;
   const drawerOrigin = document.getElementById('drawer-origin-badge') as HTMLElement;
   const drawerNumPill = document.getElementById('drawer-num-pill') as HTMLElement;
+  const drawerExpBadge = document.getElementById('drawer-exp-badge') as HTMLElement;
   const drawerExtractoBox = document.getElementById('drawer-extracto-box') as HTMLElement;
   const drawerExtractoText = document.getElementById('drawer-extracto-text') as HTMLElement;
   const drawerIframe = document.getElementById('drawer-pdf-iframe') as HTMLIFrameElement;
@@ -590,6 +695,7 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
     const origin = btn.dataset.origin || '';
     const caratula = btn.dataset.caratula || 'Sin carátula';
     const extracto = btn.dataset.extracto || '';
+    const exp = btn.dataset.expediente || '';
     const hasFile = btn.dataset.hasFile === '1';
 
     drawerTitle.textContent = caratula;
@@ -601,6 +707,13 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
       drawerOrigin.style.display = 'none';
     }
     drawerNumPill.innerHTML = `<strong>${num}</strong>/${year}`;
+
+    if (exp) {
+      drawerExpBadge.textContent = `Expte: ${exp}`;
+      drawerExpBadge.style.display = 'inline-flex';
+    } else {
+      drawerExpBadge.style.display = 'none';
+    }
 
     if (extracto) {
       drawerExtractoText.textContent = extracto;
@@ -892,6 +1005,45 @@ const selectedOrigin = originsList.find((o) => o.id === originId);
     font-size: 0.8125rem;
     color: var(--text-secondary);
     line-height: 1.45;
+  }
+
+  .entity-badges-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+  }
+
+  .entity-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.12rem 0.5rem;
+    border-radius: var(--radius-pill);
+    transition: all var(--transition-fast);
+  }
+
+  .entity-pill-dni {
+    background-color: var(--sj-red-subtle);
+    color: var(--sj-red);
+    border: 1px solid var(--sj-red-border);
+  }
+  .entity-pill-dni:hover {
+    background-color: var(--sj-red);
+    color: white;
+  }
+
+  .entity-pill-person {
+    background-color: #EFF6FF;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+  }
+  .entity-pill-person:hover {
+    background-color: #1E40AF;
+    color: white;
   }
 
   .actions-cell {

@@ -1,8 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '../db/client';
 import { documents, documentRevisions } from '../db/schema';
 import { storage } from '../storage';
-import pdfParse from 'pdf-parse';
+import { analyzePdfBufferAndFilename } from './extractor';
 
 export async function processDocumentOcr(documentId: string) {
   try {
@@ -18,28 +18,16 @@ export async function processDocumentOcr(documentId: string) {
 
     const buffer = await storage.getBuffer(doc.fileKey);
     if (!buffer) {
-      await db.update(documents).set({ ocrStatus: 'failed', ocrError: 'No se pudo leer el archivo físico' }).where(eq(documents.id, documentId));
-      return { success: false, reason: 'Archivo no encontrado en storage' };
+      await db.update(documents).set({ ocrStatus: 'failed', ocrError: 'No se pudo leer el archivo PDF desde la base de datos' }).where(eq(documents.id, documentId));
+      return { success: false, reason: 'Archivo no encontrado en document_files' };
     }
 
-    let extractedText = '';
+    // Paso 1: Análisis automático integral del PDF (texto + DNI + CUIL + Nombres Asociados + Instituciones)
+    const analysis = await analyzePdfBufferAndFilename(buffer, doc.fileName || 'documento.pdf');
+    let extractedText = analysis.rawText;
 
-    // Paso 1: Extracción digital rápida mediante pdf-parse
-    try {
-      const parsed = await pdfParse(buffer);
-      if (parsed.text && parsed.text.trim().length > 30) {
-        extractedText = parsed.text.trim();
-        // Guardar recuento de páginas si está disponible
-        if (parsed.numpages) {
-          await db.update(documents).set({ pageCount: parsed.numpages }).where(eq(documents.id, documentId));
-        }
-      }
-    } catch (parseErr) {
-      console.warn('Extracción directa con pdf-parse no concluyente:', parseErr);
-    }
-
-    // Paso 2: Si el PDF es un escaneo de imágenes sin texto digital embebido, invocar Tesseract.js
-    if (!extractedText || extractedText.length <= 30) {
+    // Paso 2: Si el PDF es un escaneo de imágenes sin texto digital embebido, invocar Tesseract.js en español
+    if (!extractedText || extractedText.length <= 20) {
       try {
         const { createWorker } = await import('tesseract.js');
         const worker = await createWorker('spa');
@@ -51,27 +39,51 @@ export async function processDocumentOcr(documentId: string) {
       }
     }
 
-    // Persistir contenido extraído
-    const finalContent = (doc.contenido ? doc.contenido + '\n\n' : '') + extractedText;
+    // Combinar metadatos existentes con los detectados en el PDF
+    const currentMeta = doc.extractedMetadata || {};
+    const mergedMeta = {
+      expediente: currentMeta.expediente || analysis.expediente || null,
+      dnis: Array.from(new Set([...(currentMeta.dnis || []), ...(analysis.metadata.dnis || [])])),
+      cuils: Array.from(new Set([...(currentMeta.cuils || []), ...(analysis.metadata.cuils || [])])),
+      people: Array.from(new Set([...(currentMeta.people || []), ...(analysis.metadata.people || [])])),
+      institutions: Array.from(new Set([...(currentMeta.institutions || []), ...(analysis.metadata.institutions || [])])),
+      detectedDate: currentMeta.detectedDate || analysis.metadata.detectedDate || null,
+    };
+
+    const finalContent = doc.contenido?.trim()
+      ? doc.contenido.trim()
+      : extractedText;
 
     await db.update(documents).set({
-      contenido: finalContent.trim(),
+      contenido: finalContent || doc.caratula || '',
+      pageCount: analysis.pageCount || doc.pageCount || 1,
+      expediente: doc.expediente || analysis.expediente || null,
+      extractedMetadata: mergedMeta,
       ocrStatus: 'completed',
       ocrError: null,
       ocrCompletedAt: new Date(),
     }).where(eq(documents.id, documentId));
 
-    // Registrar revisión de OCR
+    // Obtener última versión de revisión para incrementar correlativamente
+    const lastRev = await db
+      .select({ version: documentRevisions.version })
+      .from(documentRevisions)
+      .where(eq(documentRevisions.documentId, documentId))
+      .orderBy(desc(documentRevisions.version))
+      .limit(1);
+
+    const nextVersion = (lastRev[0]?.version || 1) + 1;
+
     await db.insert(documentRevisions).values({
       documentId,
-      version: 99,
+      version: nextVersion,
       action: 'ocr_update',
       changedBy: null,
-      snapshot: { ocrSuccess: true, charsExtracted: extractedText.length },
-      diff: { extractedTextSample: extractedText.slice(0, 100) },
+      snapshot: { ocrSuccess: true, charsExtracted: extractedText.length, extractedMetadata: mergedMeta },
+      diff: { extractedTextSample: extractedText.slice(0, 140), entitiesDetected: mergedMeta },
     });
 
-    return { success: true, chars: extractedText.length };
+    return { success: true, chars: extractedText.length, metadata: mergedMeta };
   } catch (err: any) {
     console.error('Error procesando OCR del documento:', err);
     await db.update(documents).set({

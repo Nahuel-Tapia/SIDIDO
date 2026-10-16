@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { storage } from '../../../server/storage';
 import { env } from '../../../env';
 import { canCreateOrEdit } from '../../../server/auth/permissions';
+import { analyzePdfBufferAndFilename } from '../../../server/services/extractor';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user || !canCreateOrEdit(locals.user.role)) {
@@ -58,8 +59,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // Generar clave única de archivo
     const fileKey = `${randomUUID()}.pdf`;
 
-    // Guardar en la capa de almacenamiento
-    await storage.save(fileKey, buffer);
+    // Guardar en PostgreSQL (tabla document_files) y en caché local
+    await storage.save(fileKey, buffer, {
+      fileName: file.name,
+      mimeType: 'application/pdf',
+      sha256: fileSha256,
+      uploadedBy: locals.user.id,
+    });
+
+    // Analizar automáticamente el PDF (extraer DNI, CUIL, nombres asociados, instituciones, año, número, tipo, carátula, extracto)
+    const analysis = await analyzePdfBufferAndFilename(buffer, file.name);
 
     return new Response(
       JSON.stringify({
@@ -68,12 +77,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
         fileName: file.name,
         fileSize: file.size,
         fileSha256,
+        storedInDb: true,
+        analysis,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
-    console.error('Error al subir archivo:', err);
-    return new Response(JSON.stringify({ error: 'Error procesando la carga del archivo' }), {
+    console.error('Error al subir archivo a la base de datos:', err);
+    return new Response(JSON.stringify({ error: 'Error procesando la carga del archivo en la base de datos' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

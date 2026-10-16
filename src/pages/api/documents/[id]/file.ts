@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getDocumentById } from '../../../../server/services/documents';
 import { storage } from '../../../../server/storage';
+import { generateOfficialPdfBuffer } from '../../../../server/storage/pdf-generator';
 import { logAudit } from '../../../../server/services/audit';
 
 export const GET: APIRoute = async ({ params, url, locals, clientAddress, request }) => {
@@ -15,19 +16,23 @@ export const GET: APIRoute = async ({ params, url, locals, clientAddress, reques
     return new Response('Archivo no disponible', { status: 404 });
   }
 
-  const buffer = await storage.getBuffer(docData.doc.fileKey);
+  let buffer = await storage.getBuffer(docData.doc.fileKey);
 
+  // Si aún no existe el binario en document_files, generamos y persistimos el PDF oficial en la BD
   if (!buffer) {
-    // Si es un documento de muestra sin archivo físico, generamos un PDF mínimo en memoria con su contenido
-    const sampleText = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n180\n%%EOF`;
-    const fallbackBuffer = Buffer.from(sampleText);
+    buffer = generateOfficialPdfBuffer({
+      typeName: docData.typeName,
+      originName: docData.originName ? `${docData.originName} (${docData.originCode})` : null,
+      number: docData.doc.number,
+      year: docData.doc.year,
+      caratula: docData.doc.caratula,
+      extracto: docData.doc.extracto,
+      contenido: docData.doc.contenido,
+    });
 
-    return new Response(fallbackBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${docData.doc.fileName || 'documento.pdf'}"`,
-      },
+    await storage.save(docData.doc.fileKey, buffer, {
+      fileName: docData.doc.fileName || `${docData.typeCode}_${docData.doc.number || id}.pdf`,
+      uploadedBy: docData.doc.createdBy,
     });
   }
 
@@ -43,7 +48,7 @@ export const GET: APIRoute = async ({ params, url, locals, clientAddress, reques
       entityId: id,
       ipAddress: clientAddress,
       userAgent: request.headers.get('user-agent'),
-      details: { fileName, fileSize: docData.doc.fileSize },
+      details: { fileName, fileSize: buffer.byteLength },
     });
   }
 
@@ -51,8 +56,9 @@ export const GET: APIRoute = async ({ params, url, locals, clientAddress, reques
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
+      'Content-Length': String(buffer.byteLength),
       'Content-Disposition': `${isDownload ? 'attachment' : 'inline'}; filename="${fileName}"`,
-      'Cache-Control': 'private, max-age=3600',
+      'Cache-Control': 'private, max-age=300',
     },
   });
 };

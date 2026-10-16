@@ -11,7 +11,7 @@ dist/
 .env.local
 
 # Almacenamiento local de PDFs
-storage/
+/storage/
 
 # Logs y reportes temporales
 *.log

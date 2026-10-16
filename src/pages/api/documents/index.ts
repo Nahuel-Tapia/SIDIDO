@@ -15,6 +15,9 @@ export const GET: APIRoute = async ({ url, locals, clientAddress, request }) => 
   const originId = url.searchParams.get('originId') ? Number(url.searchParams.get('originId')) : undefined;
   const number = url.searchParams.get('number') || undefined;
   const year = url.searchParams.get('year') ? Number(url.searchParams.get('year')) : undefined;
+  const expediente = url.searchParams.get('expediente') || undefined;
+  const dni = url.searchParams.get('dni') || undefined;
+  const persona = url.searchParams.get('persona') || undefined;
   const caratula = url.searchParams.get('caratula') || undefined;
   const extracto = url.searchParams.get('extracto') || undefined;
   const contenido = url.searchParams.get('contenido') || undefined;
@@ -28,6 +31,9 @@ export const GET: APIRoute = async ({ url, locals, clientAddress, request }) => 
     originId,
     number,
     year,
+    expediente,
+    dni,
+    persona,
     caratula,
     extracto,
     contenido,
@@ -37,14 +43,14 @@ export const GET: APIRoute = async ({ url, locals, clientAddress, request }) => 
   });
 
   // Registrar auditoría de búsqueda si se usó algún filtro
-  if (q || typeId || originId || number || year || caratula || extracto || contenido) {
+  if (q || typeId || originId || number || year || expediente || dni || persona || caratula || extracto || contenido) {
     await logAudit({
       userId: locals.user.id,
       action: 'doc.search',
       entityType: 'document',
       ipAddress: clientAddress,
       userAgent: request.headers.get('user-agent'),
-      details: { q, typeId, originId, number, year, caratula, totalFound: result.total },
+      details: { q, typeId, originId, number, year, expediente, dni, persona, caratula, totalFound: result.total },
     });
   }
 
@@ -64,7 +70,7 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
 
   try {
     const body = await request.json();
-    const { typeId, originId, number, year, caratula, extracto, contenido, fileKey, fileName, fileSize, fileSha256 } = body;
+    const { typeId, originId, number, year, expediente, caratula, extracto, contenido, fileKey, fileName, fileSize, fileSha256, pageCount, extractedMetadata } = body;
 
     if (!typeId) {
       return new Response(JSON.stringify({ error: 'El Tipo de Documento es obligatorio' }), {
@@ -78,6 +84,7 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
       originId: originId ? Number(originId) : null,
       number: number ? String(number) : null,
       year: year ? Number(year) : null,
+      expediente: expediente ? String(expediente) : null,
       caratula: caratula ? String(caratula) : null,
       extracto: extracto ? String(extracto) : null,
       contenido: contenido ? String(contenido) : null,
@@ -85,6 +92,8 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
       fileName: fileName || null,
       fileSize: fileSize ? Number(fileSize) : null,
       fileSha256: fileSha256 || null,
+      pageCount: pageCount ? Number(pageCount) : null,
+      extractedMetadata: extractedMetadata || null,
       ocrStatus: fileKey ? 'pending' : 'none',
       createdBy: locals.user.id,
     });

@@ -51,6 +51,11 @@ function formatBytes(bytes: number | null) {
           <span class="doc-number-pill">
             N° <strong>{doc.number || 'S/N'}</strong> / {doc.year || '----'}
           </span>
+          {doc.expediente && (
+            <span class="badge" style="background: #FFF4E5; color: #1D252D; border: 1px solid #FFD8A8; font-weight: 600; font-family: var(--font-mono);">
+              Expte: {doc.expediente}
+            </span>
+          )}
           {doc.ocrStatus === 'completed' && (
             <span class="badge badge-completed">
               <span class="badge-dot"></span>
@@ -148,6 +153,90 @@ function formatBytes(bytes: number | null) {
             </div>
           )}
 
+          {doc.extractedMetadata && (
+            (doc.extractedMetadata.expediente ||
+              doc.extractedMetadata.dnis?.length ||
+              doc.extractedMetadata.cuils?.length ||
+              doc.extractedMetadata.people?.length ||
+              doc.extractedMetadata.institutions?.length ||
+              doc.extractedMetadata.detectedDate) ? (
+              <div class="extracted-entities-panel">
+                <h2 class="section-subtitle">Datos Detectados Automáticamente en el PDF</h2>
+                <div class="entities-grid">
+                  {doc.extractedMetadata.expediente && (
+                    <div class="entity-group">
+                      <span class="entity-group-label">N° de Expediente Detectado</span>
+                      <div class="entity-chips">
+                        <a href={`/consultas?expediente=${encodeURIComponent(doc.extractedMetadata.expediente)}`} class="entity-badge" style="background: #FFF4E5; color: #8F2018; border-color: #FFD8A8; font-family: var(--font-mono); font-weight: 700;" title="Ver documentos de este expediente">
+                          {doc.extractedMetadata.expediente}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {doc.extractedMetadata.dnis && doc.extractedMetadata.dnis.length > 0 && (
+                    <div class="entity-group">
+                      <span class="entity-group-label">DNI(s) Asociados</span>
+                      <div class="entity-chips">
+                        {doc.extractedMetadata.dnis.map((d) => (
+                          <a href={`/consultas?dni=${encodeURIComponent(d)}`} class="entity-badge entity-badge-dni" title="Ver todos los expedientes de este DNI">
+                            DNI {d}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {doc.extractedMetadata.cuils && doc.extractedMetadata.cuils.length > 0 && (
+                    <div class="entity-group">
+                      <span class="entity-group-label">CUIL / CUIT</span>
+                      <div class="entity-chips">
+                        {doc.extractedMetadata.cuils.map((c) => (
+                          <a href={`/consultas?dni=${encodeURIComponent(c)}`} class="entity-badge entity-badge-cuil">
+                            {c}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {doc.extractedMetadata.people && doc.extractedMetadata.people.length > 0 && (
+                    <div class="entity-group entity-group-full">
+                      <span class="entity-group-label">Nombres Asociados (Personas / Docentes / Agentes)</span>
+                      <div class="entity-chips">
+                        {doc.extractedMetadata.people.map((p) => (
+                          <a href={`/consultas?persona=${encodeURIComponent(p)}`} class="entity-badge entity-badge-person" title="Buscar documentos asociados a esta persona">
+                            {p}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {doc.extractedMetadata.institutions && doc.extractedMetadata.institutions.length > 0 && (
+                    <div class="entity-group entity-group-full">
+                      <span class="entity-group-label">Instituciones / Escuelas</span>
+                      <div class="entity-chips">
+                        {doc.extractedMetadata.institutions.map((inst) => (
+                          <a href={`/consultas?q=${encodeURIComponent(inst)}`} class="entity-badge entity-badge-inst">
+                            {inst}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {doc.extractedMetadata.detectedDate && (
+                    <div class="entity-group">
+                      <span class="entity-group-label">Fecha en el Documento</span>
+                      <span class="entity-date-val">{doc.extractedMetadata.detectedDate}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null
+          )}
+
           <h2 class="section-subtitle">Datos Registrales</h2>
           <dl class="meta-dl">
             <div class="meta-item">
@@ -157,6 +246,22 @@ function formatBytes(bytes: number | null) {
             <div class="meta-item">
               <dt>Origen / Repartición</dt>
               <dd>{originName ? `${originName} (${originCode})` : 'No especificado'}</dd>
+            </div>
+            <div class="meta-item">
+              <dt>N° de Expediente</dt>
+              <dd>
+                {doc.expediente ? (
+                  <a
+                    href={`/consultas?expediente=${encodeURIComponent(doc.expediente)}`}
+                    style="font-family: var(--font-mono); font-weight: 600; color: #E03C31; text-decoration: none;"
+                    title="Filtrar por este expediente"
+                  >
+                    {doc.expediente}
+                  </a>
+                ) : (
+                  <span style="color: var(--color-text-muted);">No especificado</span>
+                )}
+              </dd>
             </div>
             <div class="meta-item">
               <dt>Número y Año</dt>
@@ -504,6 +609,94 @@ function formatBytes(bytes: number | null) {
     color: var(--sj-charcoal);
     border-bottom: 1px solid var(--border-light);
     padding-bottom: 0.45rem;
+  }
+
+  .extracted-entities-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background-color: #F8FAFC;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 0.9rem 1rem;
+  }
+
+  .entities-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1rem;
+  }
+
+  .entity-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .entity-group-full {
+    grid-column: 1 / -1;
+  }
+
+  .entity-group-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .entity-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .entity-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.6rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+  }
+
+  .entity-badge-dni {
+    background-color: var(--sj-red-subtle);
+    color: var(--sj-red);
+    border: 1px solid var(--sj-red-border);
+  }
+  .entity-badge-dni:hover {
+    background-color: var(--sj-red);
+    color: white;
+  }
+
+  .entity-badge-cuil {
+    background-color: var(--sj-orange-subtle);
+    color: #9A3412;
+    border: 1px solid var(--sj-orange-border);
+  }
+
+  .entity-badge-person {
+    background-color: #EFF6FF;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+  }
+  .entity-badge-person:hover {
+    background-color: #1E40AF;
+    color: white;
+  }
+
+  .entity-badge-inst {
+    background-color: #F0FDF4;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+  }
+
+  .entity-date-val {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sj-charcoal);
   }
 
   .meta-dl {

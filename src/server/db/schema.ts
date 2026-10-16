@@ -1,5 +1,27 @@
-import { pgTable, text, timestamp, boolean, uuid, integer, smallint, bigint, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, uuid, integer, smallint, bigint, jsonb, pgEnum, customType } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+
+// Tipo personalizado BYTEA para almacenar binarios de PDFs directamente en PostgreSQL
+export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
+  dataType() {
+    return 'bytea';
+  },
+  toDriver(val: Buffer): Buffer {
+    return val;
+  },
+  fromDriver(val: unknown): Buffer {
+    if (Buffer.isBuffer(val)) return val;
+    if (val instanceof Uint8Array) return Buffer.from(val);
+    if (typeof val === 'string') {
+      // Formato hex de Postgres (\x...)
+      if (val.startsWith('\\x')) {
+        return Buffer.from(val.slice(2), 'hex');
+      }
+      return Buffer.from(val, 'binary');
+    }
+    return Buffer.alloc(0);
+  },
+});
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['admin', 'operador', 'consulta']);
@@ -47,28 +69,49 @@ export const origins = pgTable('origins', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// 4. Documentos Digitalizados
+// 4. Almacenamiento Binario de Archivos PDF en Base de Datos (PostgreSQL BYTEA)
+export const documentFiles = pgTable('document_files', {
+  key: text('key').primaryKey(), // Identificador único (ej: uuid.pdf)
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').default('application/pdf').notNull(),
+  fileSize: bigint('file_size', { mode: 'number' }).notNull(),
+  sha256: text('sha256').notNull(),
+  data: bytea('data').notNull(), // Contenido binario completo del PDF en la BD
+  uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 5. Documentos Digitalizados
 export const documents = pgTable('documents', {
   id: uuid('id').defaultRandom().primaryKey(),
   typeId: integer('type_id').notNull().references(() => documentTypes.id),
   originId: integer('origin_id').references(() => origins.id),
   number: text('number'),
   year: smallint('year'),
+  expediente: text('expediente'), // Número de expediente oficial (ej: 300-028554-2026)
   caratula: text('caratula'),
   extracto: text('extracto'),
   contenido: text('contenido'),
 
-  // Archivo PDF
+  // Referencia y Metadatos del Archivo PDF
   fileKey: text('file_key'),
   fileName: text('file_name'),
   fileSize: bigint('file_size', { mode: 'number' }),
   fileSha256: text('file_sha256'),
   pageCount: integer('page_count'),
 
-  // Estado OCR
+  // Estado OCR y Metadatos Extraídos Automáticamente (DNI, CUIL, Nombres Asociados, Instituciones, Fecha, Expediente)
   ocrStatus: ocrStatusEnum('ocr_status').default('none').notNull(),
   ocrError: text('ocr_error'),
   ocrCompletedAt: timestamp('ocr_completed_at', { withTimezone: true }),
+  extractedMetadata: jsonb('extracted_metadata').$type<{
+    expediente?: string | null;
+    dnis?: string[];
+    cuils?: string[];
+    people?: string[];
+    institutions?: string[];
+    detectedDate?: string | null;
+  }>(),
 
   // Auditoría y ciclo de vida
   createdBy: uuid('created_by').references(() => users.id),
@@ -82,7 +125,7 @@ export const documents = pgTable('documents', {
   deleteReason: text('delete_reason'),
 });
 
-// 5. Historial de Cambios / Revisiones
+// 6. Historial de Cambios / Revisiones
 export const documentRevisions = pgTable('document_revisions', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   documentId: uuid('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
@@ -94,7 +137,7 @@ export const documentRevisions = pgTable('document_revisions', {
   diff: jsonb('diff'),
 });
 
-// 6. Registro de Auditoría
+// 7. Registro de Auditoría
 export const auditLogs = pgTable('audit_logs', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -107,7 +150,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// 7. Migraciones e Importaciones
+// 8. Migraciones e Importaciones
 export const importRuns = pgTable('import_runs', {
   id: uuid('id').defaultRandom().primaryKey(),
   source: text('source').notNull(),

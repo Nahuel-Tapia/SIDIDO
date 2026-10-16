@@ -1,12 +1,22 @@
-import { eq, and, isNull, desc, sql } from 'drizzle-orm';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { db } from '../db/client';
 import { documents, documentTypes, origins, users, documentRevisions } from '../db/schema';
+
+export interface ExtractedMetadataPayload {
+  expediente?: string | null;
+  dnis?: string[];
+  cuils?: string[];
+  people?: string[];
+  institutions?: string[];
+  detectedDate?: string | null;
+}
 
 export interface CreateDocumentInput {
   typeId: number;
   originId?: number | null;
   number?: string | null;
   year?: number | null;
+  expediente?: string | null;
   caratula?: string | null;
   extracto?: string | null;
   contenido?: string | null;
@@ -16,6 +26,7 @@ export interface CreateDocumentInput {
   fileSha256?: string | null;
   pageCount?: number | null;
   ocrStatus?: 'none' | 'pending' | 'processing' | 'completed' | 'failed';
+  extractedMetadata?: ExtractedMetadataPayload | null;
   createdBy?: string | null;
 }
 
@@ -24,15 +35,21 @@ export interface UpdateDocumentInput {
   originId?: number | null;
   number?: string | null;
   year?: number | null;
+  expediente?: string | null;
   caratula?: string | null;
   extracto?: string | null;
   contenido?: string | null;
+  fileKey?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  fileSha256?: string | null;
+  extractedMetadata?: ExtractedMetadataPayload | null;
   updatedBy: string;
 }
 
 /**
- * Chequea si ya existe un documento activo con la misma combinación (tipo, origen, número, año).
- */
+  * Chequea si ya existe un documento activo con la misma combinación (tipo, origen, número, año).
+  */
 export async function checkDuplicate(
   typeId: number,
   originId?: number | null,
@@ -91,6 +108,7 @@ export async function createDocument(input: CreateDocumentInput) {
       originId: input.originId || null,
       number: input.number?.trim() || null,
       year: input.year || null,
+      expediente: input.expediente?.trim() || null,
       caratula: input.caratula?.trim() || null,
       extracto: input.extracto?.trim() || null,
       contenido: input.contenido?.trim() || null,
@@ -100,6 +118,7 @@ export async function createDocument(input: CreateDocumentInput) {
       fileSha256: input.fileSha256 || null,
       pageCount: input.pageCount || null,
       ocrStatus: input.ocrStatus || 'none',
+      extractedMetadata: input.extractedMetadata || {},
       createdBy: input.createdBy || null,
       updatedBy: input.createdBy || null,
     })
@@ -156,20 +175,36 @@ export async function updateDocument(id: string, input: UpdateDocumentInput) {
     .limit(1);
 
   const nextVersion = (lastRev[0]?.version || 1) + 1;
+  const isNewFile = Boolean(input.fileKey && input.fileKey !== current.doc.fileKey);
+
+  const updateFields: Record<string, any> = {
+    typeId: input.typeId,
+    originId: input.originId || null,
+    number: input.number?.trim() || null,
+    year: input.year || null,
+    expediente: input.expediente?.trim() || null,
+    caratula: input.caratula?.trim() || null,
+    extracto: input.extracto?.trim() || null,
+    contenido: input.contenido?.trim() || null,
+    updatedBy: input.updatedBy,
+    updatedAt: new Date(),
+  };
+
+  if (input.extractedMetadata !== undefined) {
+    updateFields.extractedMetadata = input.extractedMetadata;
+  }
+
+  if (isNewFile) {
+    updateFields.fileKey = input.fileKey;
+    updateFields.fileName = input.fileName || null;
+    updateFields.fileSize = input.fileSize || null;
+    updateFields.fileSha256 = input.fileSha256 || null;
+    updateFields.ocrStatus = 'pending';
+  }
 
   const [updated] = await db
     .update(documents)
-    .set({
-      typeId: input.typeId,
-      originId: input.originId || null,
-      number: input.number?.trim() || null,
-      year: input.year || null,
-      caratula: input.caratula?.trim() || null,
-      extracto: input.extracto?.trim() || null,
-      contenido: input.contenido?.trim() || null,
-      updatedBy: input.updatedBy,
-      updatedAt: new Date(),
-    })
+    .set(updateFields)
     .where(eq(documents.id, id))
     .returning();
 
@@ -177,7 +212,7 @@ export async function updateDocument(id: string, input: UpdateDocumentInput) {
   await db.insert(documentRevisions).values({
     documentId: id,
     version: nextVersion,
-    action: 'update',
+    action: isNewFile ? 'file_replace' : 'update',
     changedBy: input.updatedBy,
     snapshot: updated,
     diff: {

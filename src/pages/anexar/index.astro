@@ -32,12 +32,12 @@ const currentYear = new Date().getFullYear();
           </div>
         </div>
 
-        <!-- Banner de Autocompletado Inteligente -->
+        <!-- Banner de Autocompletado Inteligente desde el PDF -->
         <div id="autofill-banner" class="alert-autofill" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
           </svg>
-          <span>Se sugirieron campos automáticamente a partir del nombre del archivo PDF.</span>
+          <span id="autofill-banner-text">Se detectaron y completaron datos automáticamente leyendo el contenido del PDF.</span>
         </div>
 
         <!-- Alerta en Vivo de Duplicado -->
@@ -78,7 +78,7 @@ const currentYear = new Date().getFullYear();
           </div>
         </div>
 
-        <div class="form-row-2">
+        <div class="form-row-3">
           <!-- Número -->
           <div class="form-group">
             <label for="number" class="form-label">Número</label>
@@ -102,6 +102,20 @@ const currentYear = new Date().getFullYear();
               value={currentYear}
               min="1900"
               max={currentYear + 1}
+            />
+          </div>
+
+          <!-- Número de Expediente (Auto-completado con formato ej: 300-028554-2026) -->
+          <div class="form-group">
+            <label for="expediente" class="form-label">
+              N° Expediente <span class="badge-auto-tag">Auto</span>
+            </label>
+            <input
+              type="text"
+              id="expediente"
+              name="expediente"
+              class="form-input form-input-expte"
+              placeholder="Ej: 300-028554-2026"
             />
           </div>
         </div>
@@ -130,11 +144,77 @@ const currentYear = new Date().getFullYear();
           ></textarea>
         </div>
 
+        <!-- Panel de Datos y Entidades Detectadas Automáticamente (DNI, Nombres Asociados, Escuelas, Fecha) -->
+        <div class="detected-entities-box">
+          <div class="detected-entities-header">
+            <div class="detected-header-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sj-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <polyline points="17 11 19 13 23 9"></polyline>
+              </svg>
+              <span>Datos Detectados en el PDF (DNIs, Nombres Asociados e Instituciones)</span>
+            </div>
+            <span id="detected-badge-status" class="badge badge-neutral">Automático al subir PDF</span>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="detected-dnis" class="form-label">
+                DNI(s) Detectados <span class="label-hint">(separados por coma)</span>
+              </label>
+              <input
+                type="text"
+                id="detected-dnis"
+                class="form-input"
+                placeholder="Ej: 28.456.789, 31.450.992"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="detected-cuils" class="form-label">
+                CUIL(s) / Fecha Detectada
+              </label>
+              <input
+                type="text"
+                id="detected-cuils"
+                class="form-input"
+                placeholder="Ej: 27-28456789-4"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="detected-people" class="form-label">
+              Nombres Asociados (Personas / Agentes / Docentes) <span class="label-hint">(separados por punto y coma ";")</span>
+            </label>
+            <input
+              type="text"
+              id="detected-people"
+              class="form-input"
+              placeholder="Ej: María Elena Quiroga; Carlos Alberto Sarmiento"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="detected-institutions" class="form-label">
+              Escuelas / Instituciones Detectadas <span class="label-hint">(separadas por ";")</span>
+            </label>
+            <input
+              type="text"
+              id="detected-institutions"
+              class="form-input"
+              placeholder="Ej: Escuela Agrotécnica Cornelio Saavedra"
+            />
+          </div>
+          <input type="hidden" id="detected-date" value="" />
+        </div>
+
         <!-- Contenido Manual (Colapsable / Opcional) -->
         <details class="manual-content-details">
           <summary class="manual-content-summary">
-            <span>Transcripción o Contenido Manual (Opcional)</span>
-            <span class="label-hint">Si adjunta un PDF, el OCR lo indexará automáticamente</span>
+            <span>Texto Extraído del PDF / Transcripción (Editable)</span>
+            <span class="label-hint">Se completa automáticamente al analizar el PDF</span>
           </summary>
           <div class="form-group" style="margin-top: 0.75rem;">
             <textarea
@@ -266,7 +346,18 @@ const currentYear = new Date().getFullYear();
   const originSelect = document.getElementById('originId') as HTMLSelectElement;
   const numberInput = document.getElementById('number') as HTMLInputElement;
   const yearInput = document.getElementById('year') as HTMLInputElement;
+  const expedienteInput = document.getElementById('expediente') as HTMLInputElement;
   const caratulaInput = document.getElementById('caratula') as HTMLInputElement;
+  const extractoInput = document.getElementById('extracto') as HTMLTextAreaElement;
+  const contenidoInput = document.getElementById('contenido') as HTMLTextAreaElement;
+
+  const detectedDnisInput = document.getElementById('detected-dnis') as HTMLInputElement;
+  const detectedCuilsInput = document.getElementById('detected-cuils') as HTMLInputElement;
+  const detectedPeopleInput = document.getElementById('detected-people') as HTMLInputElement;
+  const detectedInstitutionsInput = document.getElementById('detected-institutions') as HTMLInputElement;
+  const detectedDateInput = document.getElementById('detected-date') as HTMLInputElement;
+  const detectedBadgeStatus = document.getElementById('detected-badge-status') as HTMLElement;
+  const autofillBannerText = document.getElementById('autofill-banner-text') as HTMLElement;
 
   // Manejo de Dropzone
   dropzone.addEventListener('click', () => fileInput.click());
@@ -312,13 +403,12 @@ const currentYear = new Date().getFullYear();
     return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
 
-  // Autocompletado inteligente a partir del nombre del archivo PDF
+  // Autocompletado preliminar instantáneo a partir del nombre del archivo PDF
   function smartAutofillFromFilename(filename: string) {
     const base = filename.replace(/\.pdf$/i, '');
     const norm = normalizeStr(base);
     let suggestedAny = false;
 
-    // 1. Detectar Tipo de Documento si no fue elegido aún
     if (!typeSelect.value) {
       for (const opt of Array.from(typeSelect.options)) {
         if (!opt.value) continue;
@@ -335,7 +425,6 @@ const currentYear = new Date().getFullYear();
       }
     }
 
-    // 2. Detectar Origen / Repartición si no fue elegido aún
     if (!originSelect.value) {
       for (const opt of Array.from(originSelect.options)) {
         if (!opt.value) continue;
@@ -348,7 +437,6 @@ const currentYear = new Date().getFullYear();
       }
     }
 
-    // 3. Detectar Año (1990-2035)
     const yearMatch = base.match(/(?:^|[_\-\s])(19\d{2}|20[0-3]\d)(?:$|[_\-\s])/);
     const detectedYear = yearMatch ? yearMatch[1] : null;
     if (detectedYear) {
@@ -356,7 +444,6 @@ const currentYear = new Date().getFullYear();
       suggestedAny = true;
     }
 
-    // 4. Detectar Número de Documento
     if (!numberInput.value.trim()) {
       const tokens = base.split(/[_\-\s]+/);
       for (const tok of tokens) {
@@ -369,10 +456,93 @@ const currentYear = new Date().getFullYear();
       }
     }
 
+    // Detectar Número de Expediente si el nombre incluye formato XXX-XXXXXX-YYYY
+    const expteMatch = base.match(/(?:(?:expte|expediente)[_\-\s]*)?([0-9]{2,4}-[0-9]{4,8}-(?:19\d{2}|20\d{2}))/i);
+    if (expteMatch && !expedienteInput.value.trim()) {
+      expedienteInput.value = expteMatch[1];
+      suggestedAny = true;
+    }
+
     if (suggestedAny) {
       autofillBanner.style.display = 'flex';
       checkLiveDuplicate();
     }
+  }
+
+  // Aplica el análisis profundo devuelto por el servidor al leer el contenido interno del PDF
+  function applyBackendPdfAnalysis(analysis: any) {
+    if (!analysis) return;
+
+    let filledFields = 0;
+
+    if (analysis.typeId && !typeSelect.value) {
+      typeSelect.value = String(analysis.typeId);
+      filledFields++;
+    }
+    if (analysis.originId && !originSelect.value) {
+      originSelect.value = String(analysis.originId);
+      filledFields++;
+    }
+    if (analysis.number && !numberInput.value.trim()) {
+      numberInput.value = analysis.number;
+      filledFields++;
+    }
+    if (analysis.year) {
+      yearInput.value = String(analysis.year);
+      filledFields++;
+    }
+    if (analysis.expediente && !expedienteInput.value.trim()) {
+      expedienteInput.value = analysis.expediente;
+      filledFields++;
+    }
+    if (analysis.caratula && !caratulaInput.value.trim()) {
+      caratulaInput.value = analysis.caratula;
+      filledFields++;
+    }
+    if (analysis.extracto && !extractoInput.value.trim()) {
+      extractoInput.value = analysis.extracto;
+      filledFields++;
+    }
+    if (analysis.rawText && !contenidoInput.value.trim()) {
+      contenidoInput.value = analysis.rawText;
+      filledFields++;
+    }
+
+    const meta = analysis.metadata || {};
+    const dnis: string[] = meta.dnis || [];
+    const cuils: string[] = meta.cuils || [];
+    const people: string[] = meta.people || [];
+    const institutions: string[] = meta.institutions || [];
+    const detectedDate: string | null = meta.detectedDate || null;
+
+    if (dnis.length > 0) {
+      detectedDnisInput.value = dnis.join(', ');
+    }
+    if (cuils.length > 0 || detectedDate) {
+      detectedCuilsInput.value = [...cuils, detectedDate ? `Fecha: ${detectedDate}` : ''].filter(Boolean).join(' | ');
+    }
+    if (people.length > 0) {
+      detectedPeopleInput.value = people.join('; ');
+    }
+    if (institutions.length > 0) {
+      detectedInstitutionsInput.value = institutions.join('; ');
+    }
+    if (detectedDate) {
+      detectedDateInput.value = detectedDate;
+    }
+
+    const totalEntities = dnis.length + people.length + institutions.length;
+    if (totalEntities > 0 || filledFields > 0) {
+      autofillBanner.style.display = 'flex';
+      autofillBannerText.textContent = `Lectura inteligente del PDF completada: ${dnis.length} DNI(s), ${people.length} persona(s) asociada(s) y metadatos autocompletados.`;
+      detectedBadgeStatus.className = 'badge badge-completed';
+      detectedBadgeStatus.innerHTML = `<span class="badge-dot"></span> ${totalEntities} dato(s) extraído(s)`;
+    } else {
+      detectedBadgeStatus.className = 'badge badge-neutral';
+      detectedBadgeStatus.textContent = 'PDF analizado';
+    }
+
+    checkLiveDuplicate();
   }
 
   function handleFileSelected(file: File) {
@@ -391,17 +561,17 @@ const currentYear = new Date().getFullYear();
     fileNameDisplay.textContent = file.name;
     fileSizeDisplay.textContent = formatBytes(file.size);
     progressBarFill.style.width = '0%';
-    progressPercent.textContent = '0%';
+    progressPercent.textContent = 'Analizando PDF... 0%';
 
     // Mostrar previsualización local inmediata del PDF
     if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
     previewObjectUrl = URL.createObjectURL(file);
     localPdfPreview.src = previewObjectUrl;
 
-    // Intentar autocompletar campos desde el nombre del archivo
+    // Autocompletar preliminar por nombre de archivo
     smartAutofillFromFilename(file.name);
 
-    // Subida con XMLHttpRequest para obtener progreso real
+    // Subida con XMLHttpRequest para guardar en PostgreSQL y analizar entidades del PDF
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append('file', file);
@@ -410,7 +580,7 @@ const currentYear = new Date().getFullYear();
       if (e.lengthComputable) {
         const percent = Math.round((e.loaded / e.total) * 100);
         progressBarFill.style.width = percent + '%';
-        progressPercent.textContent = `Subiendo... ${percent}%`;
+        progressPercent.textContent = `Subiendo y extrayendo datos... ${percent}%`;
       }
     });
 
@@ -418,7 +588,10 @@ const currentYear = new Date().getFullYear();
       if (xhr.status >= 200 && xhr.status < 300) {
         uploadedFileData = JSON.parse(xhr.responseText);
         progressBarFill.style.backgroundColor = '#10B981';
-        progressPercent.textContent = '✓ Archivo listo para anexar';
+        progressPercent.textContent = '✓ PDF guardado en BD y datos extraídos automáticamente';
+        if (uploadedFileData.analysis) {
+          applyBackendPdfAnalysis(uploadedFileData.analysis);
+        }
       } else {
         alert('Error al subir el archivo: ' + xhr.responseText);
         resetFile();
@@ -488,18 +661,50 @@ const currentYear = new Date().getFullYear();
     formError.style.display = 'none';
     btnSave.disabled = true;
 
+    const dnisList = detectedDnisInput.value
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const cuilsList = detectedCuilsInput.value
+      .split(/[|,;]+/)
+      .map((s) => s.trim())
+      .filter((s) => s && !s.toLowerCase().startsWith('fecha:'));
+
+    const peopleList = detectedPeopleInput.value
+      .split(/[;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const institutionsList = detectedInstitutionsInput.value
+      .split(/[;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const extractedMetadata = {
+      expediente: expedienteInput.value.trim() || null,
+      dnis: dnisList,
+      cuils: cuilsList,
+      people: peopleList,
+      institutions: institutionsList,
+      detectedDate: detectedDateInput.value || null,
+    };
+
     const payload = {
       typeId: typeSelect.value,
       originId: originSelect.value || null,
       number: numberInput.value.trim() || null,
       year: yearInput.value ? Number(yearInput.value) : null,
+      expediente: expedienteInput.value.trim() || null,
       caratula: caratulaInput.value.trim() || null,
-      extracto: (document.getElementById('extracto') as HTMLTextAreaElement).value.trim() || null,
-      contenido: (document.getElementById('contenido') as HTMLTextAreaElement).value.trim() || null,
+      extracto: extractoInput.value.trim() || null,
+      contenido: contenidoInput.value.trim() || null,
       fileKey: uploadedFileData?.fileKey || null,
       fileName: uploadedFileData?.fileName || null,
       fileSize: uploadedFileData?.fileSize || null,
       fileSha256: uploadedFileData?.fileSha256 || null,
+      pageCount: uploadedFileData?.analysis?.pageCount || 1,
+      extractedMetadata,
     };
 
     try {
@@ -610,10 +815,67 @@ const currentYear = new Date().getFullYear();
     gap: 1rem;
   }
 
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 0.9fr 1.35fr;
+    gap: 0.85rem;
+  }
+
+  .badge-auto-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+    margin-left: 0.25rem;
+  }
+
+  .form-input-expte {
+    font-family: inherit;
+    font-weight: 600;
+    color: var(--sj-charcoal);
+    letter-spacing: 0.02em;
+  }
+
   .label-hint {
     font-size: 0.75rem;
     font-weight: 400;
     color: var(--text-muted);
+  }
+
+  .detected-entities-box {
+    border: 1px solid var(--border-light);
+    border-left: 3px solid var(--sj-red);
+    border-radius: var(--radius-md);
+    padding: 0.9rem 1rem;
+    background-color: #F8FAFC;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .detected-entities-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.55rem;
+  }
+
+  .detected-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--sj-charcoal);
   }
 
   .manual-content-details {

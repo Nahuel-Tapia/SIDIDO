@@ -2,11 +2,14 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db/client';
 
 export interface SearchFilters {
-  q?: string;           // Búsqueda de texto libre general
+  q?: string;           // Búsqueda de texto libre general (también busca por Expediente, DNI sin puntos o nombres asociados)
   typeId?: number;
   originId?: number;
   number?: string;
   year?: number;
+  expediente?: string;  // Filtro directo por Número de Expediente (ej: 300-028554-2026)
+  dni?: string;         // Filtro directo por DNI / CUIL
+  persona?: string;     // Filtro directo por Nombre Asociado
   caratula?: string;
   extracto?: string;
   contenido?: string;
@@ -41,6 +44,43 @@ export async function searchDocuments(filters: SearchFilters) {
     whereConditions.push(sql`lower(d.number) LIKE ${numClean}`);
   }
 
+  if (filters.expediente?.trim()) {
+    const expClean = `%${filters.expediente.trim()}%`;
+    whereConditions.push(
+      sql`(
+        coalesce(d.expediente, '') ILIKE ${expClean}
+        OR coalesce(d.extracted_metadata->>'expediente', '') ILIKE ${expClean}
+      )`
+    );
+  }
+
+  if (filters.dni?.trim()) {
+    const rawDigits = filters.dni.replace(/\D/g, '');
+    const rawLike = `%${filters.dni.trim()}%`;
+    if (rawDigits.length >= 5) {
+      const digitsLike = `%${rawDigits}%`;
+      whereConditions.push(
+        sql`(
+          coalesce(d.extracted_metadata::text, '') ILIKE ${rawLike}
+          OR regexp_replace(coalesce(d.extracted_metadata::text, '') || ' ' || coalesce(d.contenido, ''), '[^0-9]', '', 'g') LIKE ${digitsLike}
+        )`
+      );
+    } else {
+      whereConditions.push(sql`coalesce(d.extracted_metadata::text, '') ILIKE ${rawLike}`);
+    }
+  }
+
+  if (filters.persona?.trim()) {
+    const perClean = `%${filters.persona.trim()}%`;
+    whereConditions.push(
+      sql`(
+        coalesce(d.extracted_metadata::text, '') ILIKE ${perClean}
+        OR coalesce(d.caratula, '') ILIKE ${perClean}
+        OR coalesce(d.contenido, '') ILIKE ${perClean}
+      )`
+    );
+  }
+
   if (filters.caratula?.trim()) {
     const carClean = `%${filters.caratula.trim()}%`;
     whereConditions.push(sql`d.caratula ILIKE ${carClean}`);
@@ -57,13 +97,33 @@ export async function searchDocuments(filters: SearchFilters) {
   }
 
   let hasFtsQuery = false;
-  let ftsCondition: any = null;
 
   if (filters.q?.trim()) {
     hasFtsQuery = true;
     const cleanQ = filters.q.trim();
-    ftsCondition = sql`d.search_vector @@ websearch_to_tsquery('es_unaccent', ${cleanQ})`;
-    whereConditions.push(ftsCondition);
+    const digitsOnly = cleanQ.replace(/\D/g, '');
+    const ilikeQ = `%${cleanQ}%`;
+
+    if (digitsOnly.length >= 6) {
+      const digitsLike = `%${digitsOnly}%`;
+      whereConditions.push(
+        sql`(
+          d.search_vector @@ websearch_to_tsquery('es_unaccent', ${cleanQ})
+          OR coalesce(d.expediente, '') ILIKE ${ilikeQ}
+          OR coalesce(d.extracted_metadata::text, '') ILIKE ${ilikeQ}
+          OR regexp_replace(coalesce(d.expediente, '') || ' ' || coalesce(d.extracted_metadata::text, '') || ' ' || coalesce(d.contenido, ''), '[^0-9]', '', 'g') LIKE ${digitsLike}
+        )`
+      );
+    } else {
+      whereConditions.push(
+        sql`(
+          d.search_vector @@ websearch_to_tsquery('es_unaccent', ${cleanQ})
+          OR coalesce(d.expediente, '') ILIKE ${ilikeQ}
+          OR coalesce(d.extracted_metadata::text, '') ILIKE ${ilikeQ}
+          OR coalesce(d.number, '') ILIKE ${ilikeQ}
+        )`
+      );
+    }
   }
 
   const whereClause = sql.join(whereConditions, sql` AND `);
@@ -103,12 +163,14 @@ export async function searchDocuments(filters: SearchFilters) {
       d.id,
       d.number,
       d.year,
+      d.expediente,
       d.caratula,
       d.extracto,
       d.file_key,
       d.file_name,
       d.file_size,
       d.ocr_status,
+      d.extracted_metadata,
       d.created_at,
       dt.name AS type_name,
       dt.code AS type_code,
