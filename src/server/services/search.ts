@@ -46,12 +46,24 @@ export async function searchDocuments(filters: SearchFilters) {
 
   if (filters.expediente?.trim()) {
     const expClean = `%${filters.expediente.trim()}%`;
-    whereConditions.push(
-      sql`(
-        coalesce(d.expediente, '') ILIKE ${expClean}
-        OR coalesce(d.extracted_metadata->>'expediente', '') ILIKE ${expClean}
-      )`
-    );
+    const expDigits = filters.expediente.replace(/\D/g, '');
+    if (expDigits.length >= 6) {
+      const expDigitsLike = `%${expDigits}%`;
+      whereConditions.push(
+        sql`(
+          coalesce(d.expediente, '') ILIKE ${expClean}
+          OR coalesce(d.extracted_metadata->>'expediente', '') ILIKE ${expClean}
+          OR regexp_replace(coalesce(d.expediente, ''), '[^0-9]', '', 'g') LIKE ${expDigitsLike}
+        )`
+      );
+    } else {
+      whereConditions.push(
+        sql`(
+          coalesce(d.expediente, '') ILIKE ${expClean}
+          OR coalesce(d.extracted_metadata->>'expediente', '') ILIKE ${expClean}
+        )`
+      );
+    }
   }
 
   if (filters.dni?.trim()) {
@@ -144,8 +156,15 @@ export async function searchDocuments(filters: SearchFilters) {
   }
 
   // Fragmento de titular (headline / highlight) si hay búsqueda de texto
-  const headlineSql = hasFtsQuery
-    ? sql`ts_headline('es_unaccent', coalesce(d.extracto, d.caratula, ''), websearch_to_tsquery('es_unaccent', ${filters.q!.trim()}), 'StartSel = <mark>, StopSel = </mark>, MaxWords = 35, MinWords = 15') AS headline`
+  const cleanQ = filters.q?.trim() || '';
+  const hasAlphanumeric = /[a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ]/.test(cleanQ);
+
+  const headlineSql = (hasFtsQuery && hasAlphanumeric)
+    ? sql`CASE 
+        WHEN websearch_to_tsquery('es_unaccent', ${cleanQ})::text != '' 
+        THEN ts_headline('es_unaccent', coalesce(d.extracto, d.caratula, ''), websearch_to_tsquery('es_unaccent', ${cleanQ}), 'StartSel = <mark>, StopSel = </mark>, MaxWords = 35, MinWords = 15')
+        ELSE coalesce(d.extracto, d.caratula, '')
+      END AS headline`
     : sql`coalesce(d.extracto, d.caratula, '') AS headline`;
 
   // Consulta de conteo total

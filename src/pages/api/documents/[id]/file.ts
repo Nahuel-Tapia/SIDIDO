@@ -52,12 +52,16 @@ export const GET: APIRoute = async ({ params, url, locals, clientAddress, reques
     });
   }
 
+  const safeAsciiName = fileName.replace(/["\r\n\\]/g, '_').replace(/[^\x20-\x7E]/g, '_');
+  const encodedName = encodeURIComponent(fileName).replace(/['()]/g, escape);
+  const contentDisposition = `${isDownload ? 'attachment' : 'inline'}; filename="${safeAsciiName}"; filename*=UTF-8''${encodedName}`;
+
   return new Response(buffer, {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Length': String(buffer.byteLength),
-      'Content-Disposition': `${isDownload ? 'attachment' : 'inline'}; filename="${fileName}"`,
+      'Content-Disposition': contentDisposition,
       'Cache-Control': 'private, max-age=300',
     },
   });

@@ -545,14 +545,22 @@ const currentYear = new Date().getFullYear();
     checkLiveDuplicate();
   }
 
+  let isUploading = false;
+
   function handleFileSelected(file: File) {
+    formError.style.display = 'none';
+
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Solo se admiten documentos en formato PDF.');
+      formError.textContent = 'Solo se admiten documentos oficiales en formato PDF (.pdf).';
+      formError.style.display = 'block';
+      formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      alert('El archivo supera el límite de 50 MB.');
+      formError.textContent = 'El archivo supera el límite máximo permitido de 50 MB.';
+      formError.style.display = 'block';
+      formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -571,6 +579,12 @@ const currentYear = new Date().getFullYear();
     // Autocompletar preliminar por nombre de archivo
     smartAutofillFromFilename(file.name);
 
+    // Indicar carga y bloquear envío prematuro mientras se sube a PostgreSQL
+    isUploading = true;
+    btnSave.disabled = true;
+    const btnText = btnSave.querySelector('.btn-text') as HTMLElement;
+    if (btnText) btnText.textContent = 'Subiendo y asegurando PDF en base de datos...';
+
     // Subida con XMLHttpRequest para guardar en PostgreSQL y analizar entidades del PDF
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
@@ -585,6 +599,10 @@ const currentYear = new Date().getFullYear();
     });
 
     xhr.addEventListener('load', () => {
+      isUploading = false;
+      btnSave.disabled = false;
+      if (btnText) btnText.textContent = 'Guardar y Anexar Documento';
+
       if (xhr.status >= 200 && xhr.status < 300) {
         uploadedFileData = JSON.parse(xhr.responseText);
         progressBarFill.style.backgroundColor = '#10B981';
@@ -593,13 +611,25 @@ const currentYear = new Date().getFullYear();
           applyBackendPdfAnalysis(uploadedFileData.analysis);
         }
       } else {
-        alert('Error al subir el archivo: ' + xhr.responseText);
+        let errMsg = 'Error al subir el archivo.';
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          if (parsed.error) errMsg = parsed.error;
+        } catch {
+          if (xhr.responseText) errMsg = xhr.responseText;
+        }
+        formError.textContent = errMsg;
+        formError.style.display = 'block';
         resetFile();
       }
     });
 
     xhr.addEventListener('error', () => {
-      alert('Error de red al subir el archivo.');
+      isUploading = false;
+      btnSave.disabled = false;
+      if (btnText) btnText.textContent = 'Guardar y Anexar Documento';
+      formError.textContent = 'Error de conexión o red al subir el archivo PDF.';
+      formError.style.display = 'block';
       resetFile();
     });
 
@@ -659,7 +689,17 @@ const currentYear = new Date().getFullYear();
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     formError.style.display = 'none';
+
+    if (isUploading) {
+      formError.textContent = 'Por favor aguarde a que finalice la subida y análisis del archivo PDF antes de guardar.';
+      formError.style.display = 'block';
+      formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    const btnText = btnSave.querySelector('.btn-text') as HTMLElement;
     btnSave.disabled = true;
+    if (btnText) btnText.textContent = 'Guardando y registrando documento...';
 
     const dnisList = detectedDnisInput.value
       .split(/[,;]+/)
@@ -722,11 +762,13 @@ const currentYear = new Date().getFullYear();
         formError.textContent = data.error || 'Error al guardar el documento';
         formError.style.display = 'block';
         btnSave.disabled = false;
+        if (btnText) btnText.textContent = 'Guardar y Anexar Documento';
       }
     } catch (err) {
       formError.textContent = 'Error de conexión con el servidor.';
       formError.style.display = 'block';
       btnSave.disabled = false;
+      if (btnText) btnText.textContent = 'Guardar y Anexar Documento';
     }
   });
 </script>

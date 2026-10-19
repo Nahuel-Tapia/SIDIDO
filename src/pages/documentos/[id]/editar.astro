@@ -129,6 +129,7 @@ const { doc } = docData;
       <p class="danger-desc">
         Dar de baja este documento lo ocultará de las búsquedas públicas y consultas generales. Para proceder, es obligatorio ingresar el motivo de la baja.
       </p>
+      <div id="delete-error-alert" class="alert-error" style="display: none; margin-bottom: 0.5rem;"></div>
 
       <form id="delete-form" class="delete-form">
         <div class="form-group">
@@ -154,9 +155,11 @@ const { doc } = docData;
   const editForm = document.getElementById('edit-form');
   const errorAlert = document.getElementById('error-alert');
   const deleteForm = document.getElementById('delete-form');
+  const deleteErrorAlert = document.getElementById('delete-error-alert');
   const replacePdfInput = document.getElementById('replace-pdf-input');
   const uploadStatusMsg = document.getElementById('upload-status-msg');
   const btnSave = document.getElementById('btn-save');
+  const btnDelete = document.getElementById('btn-delete');
 
   let newUploadedFile = null;
 
@@ -164,7 +167,7 @@ const { doc } = docData;
     const file = replacePdfInput.files?.[0];
     if (!file) return;
 
-    uploadStatusMsg.textContent = 'Subiendo PDF a la base de datos...';
+    uploadStatusMsg.textContent = 'Subiendo y procesando nuevo PDF en la base de datos...';
     btnSave.disabled = true;
 
     const formData = new FormData();
@@ -178,14 +181,20 @@ const { doc } = docData;
       const data = await res.json();
       if (res.ok && data.success) {
         newUploadedFile = data;
-        uploadStatusMsg.textContent = `✓ Nuevo PDF cargado en BD: ${data.fileName}`;
+        uploadStatusMsg.textContent = `✓ Nuevo PDF asegurado en BD: ${data.fileName}`;
         uploadStatusMsg.style.color = '#047857';
+
+        // Si el nuevo PDF contiene expediente detectado y el campo está vacío, completarlo
+        const expInput = document.getElementById('expediente');
+        if (expInput && !expInput.value.trim() && data.analysis?.expediente) {
+          expInput.value = data.analysis.expediente;
+        }
       } else {
         uploadStatusMsg.textContent = data.error || 'Error al subir el PDF';
         uploadStatusMsg.style.color = '#B91C1C';
       }
     } catch {
-      uploadStatusMsg.textContent = 'Error de red al subir el PDF';
+      uploadStatusMsg.textContent = 'Error de conexión o red al subir el PDF';
       uploadStatusMsg.style.color = '#B91C1C';
     } finally {
       btnSave.disabled = false;
@@ -195,6 +204,8 @@ const { doc } = docData;
   editForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorAlert.style.display = 'none';
+    btnSave.disabled = true;
+    btnSave.textContent = 'Guardando cambios...';
 
     const payload = {
       typeId: document.getElementById('typeId').value,
@@ -211,6 +222,7 @@ const { doc } = docData;
             fileName: newUploadedFile.fileName,
             fileSize: newUploadedFile.fileSize,
             fileSha256: newUploadedFile.fileSha256,
+            extractedMetadata: newUploadedFile.analysis?.metadata || undefined,
           }
         : {}),
     };
@@ -228,24 +240,34 @@ const { doc } = docData;
       } else {
         errorAlert.textContent = data.error || 'Error al actualizar el documento';
         errorAlert.style.display = 'block';
+        btnSave.disabled = false;
+        btnSave.textContent = 'Guardar Cambios';
       }
     } catch (err) {
       errorAlert.textContent = 'Error de red al guardar';
       errorAlert.style.display = 'block';
+      btnSave.disabled = false;
+      btnSave.textContent = 'Guardar Cambios';
     }
   });
 
   deleteForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    deleteErrorAlert.style.display = 'none';
+
     const reason = document.getElementById('delete-reason').value.trim();
     if (!reason) {
-      alert('Debe ingresar un motivo para dar de baja el documento.');
+      deleteErrorAlert.textContent = 'Debe ingresar un motivo para dar de baja el documento.';
+      deleteErrorAlert.style.display = 'block';
       return;
     }
 
-    if (!confirm('¿Confirma que desea dar de baja este documento?')) {
+    if (!confirm('¿Confirma que desea dar de baja este documento? Esta acción lo ocultará de las consultas públicas.')) {
       return;
     }
+
+    btnDelete.disabled = true;
+    btnDelete.textContent = 'Procesando baja lógica...';
 
     try {
       const res = await fetch(`/api/documents/${docId}`, {
@@ -256,13 +278,18 @@ const { doc } = docData;
 
       const data = await res.json();
       if (res.ok && data.success) {
-        alert('Documento dado de baja con éxito.');
         window.location.href = '/consultas';
       } else {
-        alert(data.error || 'Error al dar de baja el documento');
+        deleteErrorAlert.textContent = data.error || 'Error al dar de baja el documento';
+        deleteErrorAlert.style.display = 'block';
+        btnDelete.disabled = false;
+        btnDelete.textContent = 'Confirmar Baja Lógica';
       }
     } catch (err) {
-      alert('Error de conexión con el servidor.');
+      deleteErrorAlert.textContent = 'Error de conexión con el servidor.';
+      deleteErrorAlert.style.display = 'block';
+      btnDelete.disabled = false;
+      btnDelete.textContent = 'Confirmar Baja Lógica';
     }
   });
 </script>

@@ -28,14 +28,28 @@ export async function processDocumentOcr(documentId: string) {
 
     // Paso 2: Si el PDF es un escaneo de imágenes sin texto digital embebido, invocar Tesseract.js en español
     if (!extractedText || extractedText.length <= 20) {
+      let worker: any = null;
       try {
         const { createWorker } = await import('tesseract.js');
-        const worker = await createWorker('spa');
-        const ret = await worker.recognize(buffer);
-        extractedText = ret.data.text.trim();
-        await worker.terminate();
+        worker = await createWorker('spa');
+
+        // Límite de tiempo prudencial de 60 segundos para evitar cuelgues en escaneos masivos
+        const ocrTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Tiempo de espera OCR excedido (60s)')), 60000)
+        );
+
+        const ret = await Promise.race([worker.recognize(buffer), ocrTimeout]);
+        extractedText = (ret as any).data.text.trim();
       } catch (tessErr: any) {
         console.warn('Aviso en procesamiento OCR Tesseract:', tessErr?.message || tessErr);
+      } finally {
+        if (worker) {
+          try {
+            await worker.terminate();
+          } catch {
+            // Ignorar error al terminar worker
+          }
+        }
       }
     }
 

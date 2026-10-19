@@ -24,9 +24,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Validar formato PDF
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      return new Response(JSON.stringify({ error: 'El archivo debe ser un documento PDF' }), {
+    // Validar formato PDF (extensión y tipo MIME)
+    const isPdfExt = file.name.toLowerCase().endsWith('.pdf');
+    const isPdfMime = !file.type || ['application/pdf', 'application/x-pdf'].includes(file.type.toLowerCase());
+    if (!isPdfExt || !isPdfMime) {
+      return new Response(JSON.stringify({ error: 'El archivo debe ser un documento en formato PDF (.pdf)' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
