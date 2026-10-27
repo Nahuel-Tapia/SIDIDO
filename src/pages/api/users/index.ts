@@ -34,7 +34,11 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   try {
-    const { username, fullName, email, password, role } = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Cuerpo de solicitud JSON inválido' }), { status: 400 });
+    }
+    const { username, fullName, email, password, role } = body;
 
     if (!username || !fullName || !password || !role) {
       return new Response(JSON.stringify({ error: 'Faltan campos obligatorios' }), { status: 400 });

@@ -69,7 +69,13 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Cuerpo de solicitud JSON inválido' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     const { typeId, originId, number, year, expediente, caratula, extracto, contenido, fileKey, fileName, fileSize, fileSha256, pageCount, extractedMetadata } = body;
 
     if (!typeId) {

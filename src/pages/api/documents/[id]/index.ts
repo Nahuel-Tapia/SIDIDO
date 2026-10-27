@@ -39,7 +39,13 @@ export const PUT: APIRoute = async ({ params, request, locals, clientAddress }) 
 
   try {
     const id = params.id!;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Cuerpo de solicitud JSON inválido' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     const { typeId, originId, number, year, expediente, caratula, extracto, contenido, fileKey, fileName, fileSize, fileSha256, extractedMetadata } = body;
 
     const updated = await updateDocument(id, {
